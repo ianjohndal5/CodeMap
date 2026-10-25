@@ -65,10 +65,14 @@ fs.mkdirSync(wasm, { recursive: true });
 const grammarPackage = { php: 'tree-sitter-php', ts: 'tree-sitter-typescript', tsx: 'tree-sitter-typescript', js: 'tree-sitter-javascript' };
 for (const [lang, file] of Object.entries(GRAMMAR_WASM)) fs.copyFileSync(path.join(path.dirname(require.resolve(`${grammarPackage[lang]}/package.json`)), file), path.join(wasm, file));
 
-// The root changelog ships with the extension (the versions are the same). Its relative links point into the
-// repository, which the Marketplace can only resolve once package.json has a "repository": keep their text only.
-const changelog = fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8').replace(/\[([^\]]+)\]\((?![a-z]+:)[^)]*\)/g, '$1');
+// The root changelog and license ship with the extension (same versions, same license). The changelog's relative
+// links point into the repository: absolute links to it when package.json names one, else their text only.
+const repo = pkg.repository ? sourceUrl(typeof pkg.repository === 'string' ? pkg.repository : pkg.repository.url) : null;
+const changelog = fs
+  .readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8')
+  .replace(/\[([^\]]+)\]\((?![a-z]+:)([^)]*)\)/g, (_, text, link) => (repo ? `[${text}](${repo}/blob/HEAD/${link})` : text));
 fs.writeFileSync(path.join(ext, 'CHANGELOG.md'), changelog);
+fs.copyFileSync(path.join(root, 'LICENSE'), path.join(ext, 'LICENSE'));
 
 // Third-party notices, from the packages themselves: everything the .vsix contains code, grammars or fonts from.
 /** A package's repository as a URL: "owner/repo", "github:owner/repo", "git@github.com:owner/repo" and git+ forms. */

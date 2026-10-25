@@ -30,6 +30,8 @@ try {
       '--disable-gpu',
       // CI runners can't set up Chromium's Linux sandbox helper; the tests run trusted code only.
       ...(process.platform === 'linux' ? ['--no-sandbox'] : []),
+      // CODE_HEADLESS=1 (Linux): no window at all, without Xvfb.
+      ...(process.env.CODE_HEADLESS ? ['--ozone-platform=headless'] : []),
       `--user-data-dir=${path.join(tmp, 'user-data')}`,
       `--extensions-dir=${path.join(tmp, 'extensions')}`,
     ],

@@ -5,6 +5,14 @@
   "version": "0.1.0",
   "publisher": "codemap-placeholder",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ianjohndal5/CodeMap.git"
+  },
+  "homepage": "https://github.com/ianjohndal5/CodeMap#readme",
+  "bugs": {
+    "url": "https://github.com/ianjohndal5/CodeMap/issues"
+  },
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -108,7 +116,7 @@
     "vscode:prepublish": "node ../scripts/build-extension.mjs",
     "build": "node ../scripts/build-extension.mjs",
     "test": "node test/run.mjs",
-    "package": "node -e \"require('fs').mkdirSync('../dist-extension', { recursive: true })\" && vsce package --skip-license --allow-missing-repository --out ../dist-extension/"
+    "package": "node -e \"require('fs').mkdirSync('../dist-extension', { recursive: true })\" && vsce package --out ../dist-extension/"
   },
   "dependencies": {
     "fast-glob": "3.3.3",

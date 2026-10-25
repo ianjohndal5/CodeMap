@@ -1,5 +1,8 @@
 // The analysis, in a child process forked by the extension: the CLI's analyzer on the WebAssembly parser. One
 // analysis per process, so the editor never waits on it and the parser's memory goes away with the process.
+// The request comes in the environment (CODEMAP_WORKER_REQUEST, JSON), not as an IPC message: this module loads
+// asynchronously, and Node drops IPC messages that arrive before a 'message' listener exists. Messages only go
+// out: stages, then one 'done' or 'error'.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -16,7 +19,19 @@ async function blockNetwork() {
   dns.promises.lookup = fail;
 }
 
-process.once('message', async (req) => {
+// Keep the event loop turning until the last message is written: on Node 20.9 (VS Code 1.90) an idle loop can
+// stall (see wasmRuntime in analyzer/wasm-runtime.js), here also after the analysis.
+const awake = setInterval(() => {}, 25);
+
+/** Send the last message, and leave only once it is written: exiting earlier can lose it. */
+function finish(message) {
+  process.send(message, () => {
+    clearInterval(awake);
+    process.disconnect();
+  });
+}
+
+async function main(req) {
   try {
     if (process.env.CODEMAP_EXTENSION_NO_NET === '1') await blockNetwork();
     const wts = await import('web-tree-sitter');
@@ -56,7 +71,7 @@ process.once('message', async (req) => {
       onStage: (stage) => process.send({ type: 'stage', stage }),
     });
     fs.writeFileSync(req.out, JSON.stringify(graph));
-    process.send({
+    finish({
       type: 'done',
       backend: roots.backend,
       frontend: roots.frontend,
@@ -68,7 +83,8 @@ process.once('message', async (req) => {
       security: graph.security ? { summary: graph.security.summary, classifyFirst: graph.security.classifyFirst } : null,
     });
   } catch (e) {
-    process.send({ type: 'error', message: e?.message ?? String(e) });
+    finish({ type: 'error', message: e?.message ?? String(e) });
   }
-  process.disconnect();
-});
+}
+
+void main(JSON.parse(process.env.CODEMAP_WORKER_REQUEST ?? '{}'));

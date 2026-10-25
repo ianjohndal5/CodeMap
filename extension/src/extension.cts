@@ -179,11 +179,17 @@ class MapView implements vscode.Disposable {
   private runWorker(request: object, progress: vscode.Progress<{ message?: string }>, token: vscode.CancellationToken): Promise<Done | undefined> {
     return new Promise((resolve) => {
       const started = Date.now();
-      const env = { ...process.env };
+      // The request goes in the environment: an IPC message sent right after fork can arrive before the worker
+      // (an ES module, loaded asynchronously) listens, and Node drops it (worker.mjs).
+      const env: NodeJS.ProcessEnv = { ...process.env, CODEMAP_WORKER_REQUEST: JSON.stringify(request) };
       if (this.testing) env.CODEMAP_EXTENSION_NO_NET = '1';
       const child = fork(vscode.Uri.joinPath(this.context.extensionUri, 'out', 'worker.mjs').fsPath, [], { stdio: ['ignore', 'ignore', 'pipe', 'ipc'], env });
       this.worker = child;
       let stderr = '';
+      let result: Done | undefined;
+      let failed = false;
+      let exit: { code: number | null; signal: NodeJS.Signals | null } | undefined;
+      let disconnected = false;
       child.stderr?.on('data', (d) => (stderr += d));
       token.onCancellationRequested(() => {
         child.kill();
@@ -192,22 +198,40 @@ class MapView implements vscode.Disposable {
       child.on('message', (m: Message) => {
         if (m.type === 'stage') progress.report({ message: STAGES[m.stage as string] ?? String(m.stage) });
         else if (m.type === 'done') {
-          this.lastRun = { ...(m as unknown as Done), wallMs: Date.now() - started };
-          resolve(m as unknown as Done);
+          result = m as unknown as Done;
+          this.lastRun = { ...result, wallMs: Date.now() - started };
+          resolve(result);
+          // The worker leaves by itself; one still there after reporting is stuck on the way out.
+          setTimeout(() => {
+            if (child.exitCode === null && child.signalCode === null) child.kill();
+          }, 5000).unref();
         } else if (m.type === 'error') {
+          failed = true;
           this.say('error', String(m.message));
           void vscode.window.showErrorMessage(`${this.name}: ${m.message}`);
           resolve(undefined);
         }
       });
-      child.on('exit', (code) => {
+      // 'exit' can come before the last messages: only when the process has exited and its IPC channel has closed
+      // (messages still in flight are delivered before 'disconnect') is a missing result a failure.
+      const ended = () => {
+        if (!exit || !disconnected) return;
         if (this.worker === child) this.worker = undefined;
-        if (code && !token.isCancellationRequested) {
-          void vscode.window.showErrorMessage(`${this.name}: the analysis stopped unexpectedly (exit code ${code}). ${stderr.trim().split('\n').slice(-3).join(' ')}`);
+        if (!result && !failed && !token.isCancellationRequested) {
+          const why = `the analysis stopped without a result (${exit.signal ? `signal ${exit.signal}` : `exit code ${exit.code}`}). ${stderr.trim().split('\n').slice(-3).join(' ')}`;
+          this.say('error', why);
+          void vscode.window.showErrorMessage(`${this.name}: ${why}`);
         }
-        resolve(undefined);
+        resolve(result);
+      };
+      child.on('exit', (code, signal) => {
+        exit = { code, signal };
+        ended();
       });
-      child.send(request);
+      child.on('disconnect', () => {
+        disconnected = true;
+        ended();
+      });
     });
   }
 
@@ -348,34 +372,31 @@ class MapView implements vscode.Disposable {
   /** For the extension's integration tests (test runs only). */
   testApi() {
     let seq = 0;
-    const next = (type: string, timeoutMs = 60_000) =>
-      new Promise<Message>((resolve, reject) => {
+    /** The next message matching `match` from the webview, or an error after `timeoutMs`. */
+    const waitFor = (what: string, match: (m: Message) => boolean, timeoutMs: number) => {
+      const promise = new Promise<Message>((resolve, reject) => {
         const timer = setTimeout(() => {
           this.listeners.delete(listener);
-          reject(new Error(`no "${type}" message from the webview within ${timeoutMs} ms`));
+          reject(new Error(`no ${what} from the webview within ${timeoutMs} ms`));
         }, timeoutMs);
         const listener = (m: Message) => {
-          if (m.type !== type) return;
+          if (!match(m)) return;
           clearTimeout(timer);
           this.listeners.delete(listener);
           resolve(m);
         };
         this.listeners.add(listener);
       });
+      // A test that fails before awaiting it must not also report an unhandled rejection.
+      promise.catch(() => {});
+      return promise;
+    };
     return {
       activationMs: this.activationMs,
-      next,
-      query: async (action: string, extra: object = {}) => {
+      next: (type: string, timeoutMs = 60_000) => waitFor(`"${type}" message`, (m) => m.type === type, timeoutMs),
+      query: (action: string, extra: object = {}) => {
         const id = ++seq;
-        const result = new Promise<Message>((resolve) => {
-          const listener = (m: Message) => {
-            if (m.type === 'testResult' && m.seq === id) {
-              this.listeners.delete(listener);
-              resolve(m);
-            }
-          };
-          this.listeners.add(listener);
-        });
+        const result = waitFor(`answer to "${action}"`, (m) => m.type === 'testResult' && m.seq === id, 15_000);
         this.post({ type: 'test', action, seq: id, ...extra });
         return result;
       },

@@ -16,6 +16,14 @@
     "security-review"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ianjohndal5/CodeMap.git"
+  },
+  "homepage": "https://github.com/ianjohndal5/CodeMap#readme",
+  "bugs": {
+    "url": "https://github.com/ianjohndal5/CodeMap/issues"
+  },
   "type": "module",
   "bin": {
     "codemap": "dist/cli.js"

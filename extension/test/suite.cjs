@@ -148,9 +148,9 @@ exports.run = async () => {
     fs.writeFileSync(path.join(dir, `${id}.config.json`), JSON.stringify({ backend: 'api', security: { authMiddleware: ['api'] } }));
     const runWorker = (untrusted) =>
       new Promise((resolve, reject) => {
-        const child = fork(path.join(extDir, 'out', 'worker.mjs'), [], { env: { ...process.env, CODEMAP_EXTENSION_NO_NET: '1' } });
+        const request = { folder: dir, backend: null, frontend: null, configFile: null, security: true, untrusted, out: path.join(dir, `graph-${untrusted}.json`), wasmDir: path.join(extDir, 'out', 'wasm') };
+        const child = fork(path.join(extDir, 'out', 'worker.mjs'), [], { env: { ...process.env, CODEMAP_EXTENSION_NO_NET: '1', CODEMAP_WORKER_REQUEST: JSON.stringify(request) } });
         child.on('message', (m) => (m.type === 'done' ? resolve(m) : m.type === 'error' ? reject(new Error(m.message)) : null));
-        child.send({ folder: dir, backend: null, frontend: null, configFile: null, security: true, untrusted, out: path.join(dir, `graph-${untrusted}.json`), wasmDir: path.join(extDir, 'out', 'wasm') });
       });
     const trusted = await runWorker(false);
     const restricted = await runWorker(true);

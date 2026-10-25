@@ -20,10 +20,17 @@ export const GRAMMAR_WASM: Record<LangId, string> = {
 
 /** Initialize web-tree-sitter and load the four grammars; `grammarFile` maps a file name to its path. */
 export async function wasmRuntime(wts: WebTreeSitter, grammarFile: (name: string) => string): Promise<ParserRuntime> {
-  await wts.Parser.init();
-  const languages = {} as Record<LangId, unknown>;
-  for (const [lang, file] of Object.entries(GRAMMAR_WASM) as [LangId, string][]) languages[lang] = await wts.Language.load(grammarFile(file));
-  return { Parser: wts.Parser as unknown as ParserRuntime['Parser'], Query: wts.Query as unknown as ParserRuntime['Query'], languages };
+  // On Node 20.9 (VS Code 1.90's runtime) the asynchronous WebAssembly compilation sometimes never resumes when the
+  // event loop has nothing else to do (about 5% of starts, measured); a running timer keeps the loop turning.
+  const awake = setInterval(() => {}, 25);
+  try {
+    await wts.Parser.init();
+    const languages = {} as Record<LangId, unknown>;
+    for (const [lang, file] of Object.entries(GRAMMAR_WASM) as [LangId, string][]) languages[lang] = await wts.Language.load(grammarFile(file));
+    return { Parser: wts.Parser as unknown as ParserRuntime['Parser'], Query: wts.Query as unknown as ParserRuntime['Query'], languages };
+  } finally {
+    clearInterval(awake);
+  }
 }
 
 /** All four grammar files in one folder (the extension's layout). */

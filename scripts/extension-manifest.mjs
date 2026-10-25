@@ -23,6 +23,8 @@ export function extensionManifest(pkg, current = {}) {
     publisher: current.publisher ?? 'codemap-placeholder',
     license: pkg.license,
     ...(pkg.repository ? { repository: pkg.repository } : {}),
+    ...(pkg.homepage ? { homepage: pkg.homepage } : {}),
+    ...(pkg.bugs ? { bugs: pkg.bugs } : {}),
     engines: current.engines ?? { vscode: '^1.90.0' },
     categories: current.categories ?? ['Visualization', 'Other'],
     keywords: pkg.keywords,

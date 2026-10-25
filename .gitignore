@@ -9,4 +9,5 @@ node_modules/
 /extension/out/
 /extension/node_modules/
 /extension/CHANGELOG.md
+/extension/LICENSE
 /extension/.vscode-test/
