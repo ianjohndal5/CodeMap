@@ -51,6 +51,8 @@ export function serve(opts: ServeOptions): Promise<{ url: string; server: http.S
     let file: string | null = null;
     if (url.pathname === '/' || url.pathname === '/index.html') file = path.join(VIEWER_DIR, 'index.html');
     else if (url.pathname === '/graph.json') file = opts.graphFile;
+    // The format check the viewer runs before rendering, compiled from src/schema.ts next to this file.
+    else if (url.pathname === '/schema.js') file = path.join(here, 'schema.js');
     else if (url.pathname.startsWith('/vendor/')) file = vendor[url.pathname.slice('/vendor/'.length)] ?? null;
     else {
       const candidate = path.join(VIEWER_DIR, path.normalize(url.pathname).replace(/^([/\\])+/, ''));

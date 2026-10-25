@@ -120,6 +120,8 @@ export interface Timings {
 }
 
 export interface Graph {
+  /** Format version (SCHEMA_VERSION in schema.ts); the first key of graph.json. */
+  schemaVersion: number;
   meta: {
     tool: string;
     version: string;

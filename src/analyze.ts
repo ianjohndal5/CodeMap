@@ -4,6 +4,7 @@ import { GraphBuilder } from './graph.js';
 import { NextAdapter } from './lang/js/index.js';
 import { LaravelAdapter } from './lang/php/index.js';
 import { link } from './link.js';
+import { SCHEMA_VERSION } from './schema.js';
 import { analyzeSecurity } from './security/index.js';
 import type { AnalyzeOptions, Graph, Stats, Timings } from './types.js';
 import { toPosix } from './util/paths.js';
@@ -90,6 +91,7 @@ export function analyze(opts: AnalyzeOptions): AnalyzeResult {
   if (graph.diagnosticsDropped) warnings.push(`${graph.diagnosticsDropped} more diagnostics were not recorded (at most 250 per reason).`);
 
   const result: Graph = {
+    schemaVersion: SCHEMA_VERSION,
     meta: {
       tool: 'codemap',
       version: VERSION,

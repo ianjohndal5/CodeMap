@@ -24,6 +24,8 @@ export function analyze(opts: ProjectOptions): { graph: Graph } {
 }
 
 export { VERSION } from './brand.js';
+export { SCHEMA_VERSION, checkSchema } from './schema.js';
+export type { SchemaProblem } from './schema.js';
 export { defaultConfig, loadConfig } from './config.js';
 export type { CodemapConfig, LaravelOptions, NextOptions, SecurityOptions } from './config.js';
 export { findProjects, resolveRoots } from './detect.js';

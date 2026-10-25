@@ -8,6 +8,7 @@ import { Minimap } from './minimap.js';
 import { buildModel, descendants, displayName, editorUrl, groupKey, iconOf, labelOf, search, sizeOf } from './model.js';
 import { esc, methodPill, renderFilters, renderInsights, renderInspectEdge, renderInspectEmpty, renderInspectNode, renderSecurity, suggestedStart, tooltipHtml } from './panel.js';
 import { computeRoutes, routeStyle } from './route.js';
+import { checkSchema } from './schema.js'; // served from dist/schema.js (src/schema.ts), shared with the API
 import { BAND, GROUPS, GROUP_ORDER, LANES, THEMES, laneOf, methodBadge, methodColor } from './theme.js';
 
 // Below these sizes the real cards are laid out with ELK layered ("flow"); above
@@ -1436,6 +1437,14 @@ async function main() {
     graph = await res.json();
   } catch (err) {
     $('#status-left').textContent = 'Could not load graph.json: ' + err.message;
+    return;
+  }
+  // A file from another format version would render wrongly or fail halfway: say so instead.
+  const problem = checkSchema(graph);
+  if (problem) {
+    $('#load-problem-text').textContent = problem.message;
+    $('#load-problem').hidden = false;
+    $('#status-left').textContent = 'graph.json not shown';
     return;
   }
   const app = new App(graph, themeName);

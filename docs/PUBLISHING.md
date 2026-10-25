@@ -28,7 +28,7 @@ npm install && npm test
 
 It sets `name`, `bin` and `displayName` in `package.json` (the code derives the command, the config file name
 `<command>.config.json`, the output directory `.<command>` and the titles from them) and rewrites the prose in
-sources, tests, viewer, docs and CI.
+sources, tests, viewer, docs, `CHANGELOG.md` and CI.
 
 ## 2. License
 
@@ -57,17 +57,65 @@ In `package.json`:
   from CI with provenance, an automation or granular access token stored as a repository secret, or npm's
   trusted publishing with GitHub Actions.
 * **VS Code Marketplace** (for the extension, step 2): a publisher at <https://marketplace.visualstudio.com/manage>
-  (signs in with a Microsoft account), and an Azure DevOps personal access token with the *Marketplace (Manage)*
-  scope for `vsce`.
+  (signs in with a Microsoft account). For `vsce`, sign in with Microsoft Entra ID (`vsce publish
+  --azure-credential`): Azure DevOps retires global personal access tokens on 1 December 2026, and the
+  publishing guide recommends Entra ID instead.
 * **Open VSX** (Cursor, Windsurf, VSCodium...): an Eclipse Foundation account, the Open VSX publisher agreement
   signed, an access token from <https://open-vsx.org/user-settings/tokens>, and the namespace created once with
   `npx ovsx create-namespace <publisher>`.
 
 ## 5. Versioning
 
-Semantic versioning. The stable surface is the command line (options and exit codes), the `graph.json` format
-and the `analyze()` API; changes there are breaking. While the version is `0.x`, a minor release may break.
-Bump with `npm version patch|minor|major` (it tags the commit).
+Semantic versioning over a defined public surface. The README's [Versioning](../README.md#versioning) section
+is the short version for users; this is the full definition to classify a change by.
+
+### The public surface
+
+What users and tools depend on. The README documents each part; the code is the source of truth.
+
+| Part | What it covers | Documented in | Code |
+| --- | --- | --- | --- |
+| Command line | The `[root]` argument and the options `--backend`, `--frontend`, `--config`, `--out`, `--port`, `--no-open`, `--json-only`, `--list`, `--security`, `--sarif`, `--version`, `--help`. Their behavior: `graph.json` written to `<out>/graph.json` (default `.codemap/`), `./codemap.config.json` read when present, flags overriding the config's roots, monorepo detection, the next free port when busy. Exit codes: `0` when the analysis ran, whatever it found; `1` on any error. | README: Usage | `src/cli.ts`, `src/brand.ts` |
+| Config file | Every key of `codemap.config.json`, with its type, default and meaning: `backend`, `frontend`; `laravel.apiPrefix`, `.controllerNamespace`, `.include`, `.exclude`; `next.include`, `.exclude`, `.backendEnvVars`, `.baseUrlVariables`, `.backendHosts`, `.backendBasePath`; `security.authMiddleware`, `.authorizationMiddleware`, `.publicMiddleware`, `.ignoreMiddleware`, `.sarif`, `.checks`, `.disableChecks`. Comments and trailing commas are allowed; relative paths resolve against the file's directory. | README: Configuration | `src/config.ts` |
+| `graph.json` | `schemaVersion`; every field of `meta`, nodes, edges, `unmatched`, `diagnostics` and `security`, with its type and meaning; the enumerations (node and edge kinds, `via`, protection states, finding origins and levels, unknown reasons); the node ID formats and finding IDs (`origin/tool/rule@file:line`); the sort order; determinism (the same code and version give the same file apart from the per-run fields). | README: `graph.json`, Security lens → Output and viewer | `src/types.ts`, `src/security/types.ts`, `src/schema.ts` |
+| API | What the package entry exports: `analyze`, `loadConfig`, `defaultConfig`, `resolveRoots`, `findProjects`, `checkSchema`, `VERSION`, `SCHEMA_VERSION`, and the exported types. `exports` in `package.json` allows no other import path (besides `package.json` itself). | README: Programmatic API | `src/index.ts` |
+| Platforms | The supported Node.js versions (`engines`: 20 or newer) and the prebuilt platforms (Linux, macOS, Windows on x64 and arm64). | README: Installation | `package.json`, `native-prebuilds/` |
+
+Not part of the surface, so free to change in any release: the viewer's interface (layout, controls,
+shortcuts); the terminal summary (scripts should read `graph.json`, not standard output); the wording of
+human-readable texts in `graph.json` (warnings, reasons, messages, hints, caveats, labels), so comparisons should
+use structured fields such as IDs, kinds, states and counts; the per-run fields `meta.generatedAt`,
+`meta.durationMs`, `meta.timings` and the absolute `meta.backendRoot` and `meta.frontendRoot`; which items the
+capped `diagnostics` sample holds; and anything the entry point does not export.
+
+### What a change is
+
+| Change | Examples | Release from 1.0 on |
+| --- | --- | --- |
+| **Breaking** | Removing or renaming an option, config key, `graph.json` field or export. Changing a field's type or meaning, an ID format, the sort order, an exit code, a default output location or file name. Raising the minimum Node.js version or dropping a platform. Any `schemaVersion` bump. | major |
+| **Addition** | A new option, config key, field, enumeration value or export. Readers must ignore fields and values they don't know. | minor |
+| **Results may differ** | Anything that changes what the analysis finds for unchanged code: better detection, a resolver fix, a new security heuristic or check, different protection states, findings or stats. The format stays the same, but runs of two versions differ. | minor, always listed under "Results may differ" in the changelog |
+| **Fix** | A fix that leaves the `graph.json` of a successful run unchanged apart from the per-run fields: crashes, the viewer, terminal output, performance, packaging, documentation. | patch |
+
+A patch release therefore promises the same `graph.json` for the same code. A bug fix that changes analysis
+output is a "results may differ" change and goes in a minor release.
+
+**Before 1.0**, breaking changes also bump only the minor (0.1 → 0.2), and patches keep the promise above. The
+changelog marks breaking changes with **Breaking:**.
+
+### `schemaVersion`
+
+`SCHEMA_VERSION` in `src/schema.ts` is an integer, written as the first key of `graph.json`, and separate from
+the tool version in `meta.version`. Increase it only when a reader built for the current format would misread
+new files: a field removed or renamed, a field's type or meaning or an ID format changed, the structure
+reorganized. Additions don't change it. A bump is a breaking release with a **Breaking:** changelog entry, and
+`checkSchema()` then rejects files of the older version ("Run codemap again to regenerate it") unless reading
+them is added deliberately. Every reader (the viewer, the extension, the CI mode) calls `checkSchema()`, so the
+rule lives in one place.
+
+`meta.version` is the version in `package.json` (`src/brand.ts` reads it). A test checks that the API, the
+command line and `graph.json` report it, and the install-matrix workflow checks `--version` of the installed
+command on every platform.
 
 ## 6. Release (npm)
 
@@ -78,12 +126,57 @@ Bump with `npm version patch|minor|major` (it tags the commit).
 3. Push and wait for the **install-matrix** workflow (`.github/workflows/install-matrix.yml`) to pass on every
    platform: clean installs with npm and pnpm, the fixtures analyzed with the installed command, the same
    `graph.json` everywhere, and an offline run.
-4. `npm pack --dry-run` and read the file list: `dist/`, `dist/native/`, `viewer/`, `README.md`,
-   `package.json` (and `LICENSE`), nothing else. About 5.7 MB packed.
-5. `npm publish` (add `--provenance` when publishing from GitHub Actions; scoped names also need
-   `--access public`).
-6. Check it the way a user would, in an empty directory: `npx <name> --version`, then on a real project.
+4. **Changelog.** Move the entries under `## [Unreleased]` to a new `## [x.y.z] - YYYY-MM-DD` section, leaving
+   an empty `## [Unreleased]` above it. Check that every change to what the analysis finds is under "Results may
+   differ" and that breaking changes say **Breaking:**. Commit.
+5. **Bump.** `npm version x.y.z` (or `patch`, `minor`, `major`). It needs a clean working tree, refuses when
+   `CHANGELOG.md` has no section for the new version (the `preversion` script), then sets the version in
+   `package.json` and `package-lock.json`, commits, and tags the commit `vx.y.z`.
+6. **Push the commit and the tag:** `git push --follow-tags`.
+7. `npm pack --dry-run` and read the file list: `dist/`, `dist/native/`, `viewer/`, `README.md`,
+   `CHANGELOG.md`, `package.json` (and `LICENSE`), nothing else. About 5.8 MB packed.
+8. `npm publish` from the tagged commit. `prepublishOnly` checks the changelog again. Add `--provenance` when
+   publishing from GitHub Actions; scoped names also need `--access public`. A pre-release goes out with
+   `npm publish --tag next`, so it never becomes `latest`.
+9. Check it the way a user would, in an empty directory: `npx <name> --version`, then on a real project.
+
+**The first public version number is your decision.** `package.json` says `0.1.0`. If the CLI and the extension
+share one version number with the Marketplace's even/odd convention (section 7), the first stable release
+needs an even minor: `0.2.0`, or `1.0.0` to declare the surface above stable from the start. Under that
+convention `0.1.0` would read as a pre-release.
 
 ## 7. Release (VS Code extension)
 
-Filled in with step 2 (the extension): `vsce package` per platform, `vsce publish`, `ovsx publish`.
+The commands (`vsce package` per platform, `vsce publish`, `ovsx publish`) are filled in with step 2 (the
+extension). Decided so far:
+
+* **One version number for the CLI and the extension** while the project is small. The extension bundles the
+  analyzer, so its version says exactly which analysis it runs. Both are released together from the same tag.
+* **Marketplace rules**, from the VS Code publishing guide (<https://code.visualstudio.com/api/working-with-extensions/publishing-extension>,
+  "Pre-release extensions", checked 2026-10-25):
+  * Versions are `major.minor.patch` only: "semver pre-release tags are **not supported**".
+  * "We recommend that extensions use `major.EVEN_NUMBER.patch` for release versions and
+    `major.ODD_NUMBER.patch` for pre-release versions", e.g. `0.2.*` for releases and `0.3.*` for pre-releases.
+  * Pre-releases are published with `vsce package --pre-release` or `vsce publish --pre-release`, and need
+    `engines.vscode` set to `>= 1.63.0`.
+  * A pre-release and a release can't share a version. VS Code updates everyone to the highest version, so
+    publish a new pre-release before a release if pre-release users should stay on pre-releases.
+* **Applied to the shared version:** even minors are stable releases everywhere (npm `latest`, Marketplace and
+  Open VSX releases); odd minors are pre-releases everywhere (npm `--tag next`, Marketplace and Open VSX
+  pre-releases). Stable minors therefore step by two (0.2, 0.4, ...).
+* **Open VSX:** its documentation doesn't cover pre-releases. The `ovsx` CLI (1.3.0) has `ovsx publish
+  --pre-release` ("Mark this package as a pre-release") when it packages the extension itself, and ignores the
+  flag for an already built `.vsix`, whose pre-release mark comes from `vsce package --pre-release`.
+* The extension checks every `graph.json` it opens with `checkSchema()`, the same check as the viewer.
+
+## 8. Planned: CI mode (not built)
+
+A command that compares two `graph.json` files, for example from the base branch and a pull request: new or
+removed endpoints, callers that disappeared, weaker protection states, new findings. For it to be reliable:
+
+* It checks both files with `checkSchema()` and refuses another format version.
+* It warns when `meta.version` differs between the two files: results may differ between versions without any
+  code change, so a difference may come from the tool. CI should pin the version (`npx codemap@x.y.z`).
+* It ignores the per-run fields and compares structured fields (IDs, kinds, states, counts), never wording.
+* It keeps the meaning of exit codes `0` and `1` and adds its own (for example "differences found"), which then
+  become part of the command-line surface. `--json-only` output stays stable and scriptable.

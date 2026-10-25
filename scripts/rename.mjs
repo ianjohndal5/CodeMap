@@ -3,7 +3,7 @@
 // package.json "name", "bin" and "displayName" are what the code reads (src/brand.ts derives the config
 // file, the output directory and the titles from them). This also rewrites the prose: every whole-word
 // "CodeMap" (display name) and "codemap" (command: codemap.config.json, .codemap, npx codemap, ...) in the
-// sources, tests, viewer, docs and CI. Run it on a clean working tree and review the diff.
+// sources, tests, viewer, docs, CHANGELOG.md and CI. Run it on a clean working tree and review the diff.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

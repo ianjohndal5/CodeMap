@@ -108,7 +108,10 @@ jobs:
       - name: Analyze the fixtures with the installed command
         run: |
           cd "$RUNNER_TEMP/consumer"
-          npx codemap --version
+          # The installed command reports package.json's version (graph.json's meta.version is in the compare job).
+          reported="$(npx codemap --version)"
+          expected="$(node -p "require(require('path').join(process.env.GITHUB_WORKSPACE, 'package.json')).version")"
+          [ "$reported" = "$expected" ] || { echo "codemap --version printed '$reported', package.json says '$expected'"; exit 1; }
           npx codemap --backend "$GITHUB_WORKSPACE/fixtures/laravel-api" --frontend "$GITHUB_WORKSPACE/fixtures/next-web" --json-only --out out/plain
           npx codemap --backend "$GITHUB_WORKSPACE/fixtures/laravel-security" --frontend "$GITHUB_WORKSPACE/fixtures/next-security" --security --json-only --out out/security
           mkdir -p "$GITHUB_WORKSPACE/graphs"

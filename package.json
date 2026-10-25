@@ -36,7 +36,8 @@
     "dist/native/**",
     "viewer/*.html",
     "viewer/*.js",
-    "viewer/*.css"
+    "viewer/*.css",
+    "CHANGELOG.md"
   ],
   "engines": {
     "node": ">=20"
@@ -46,6 +47,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "prepack": "npm run build && node scripts/vendor-native.mjs --check",
+    "preversion": "node scripts/check-release.mjs",
+    "prepublishOnly": "node scripts/check-release.mjs",
     "codemap": "node dist/cli.js"
   },
   "dependencies": {

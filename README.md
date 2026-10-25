@@ -64,7 +64,7 @@ const { graph } = analyze({ backend: '/path/to/api', frontend: '/path/to/web', s
 console.log(graph.meta.stats, graph.security?.summary);
 ```
 
-`analyze()` takes `backend` and `frontend` roots (either may be `null`), an optional `config` (the shape of `codemap.config.json`; `loadConfig(file, cwd)` reads one, defaults otherwise) and `security`, and returns `{ graph }`: exactly what the CLI writes to `graph.json`, with TypeScript types for every field. `resolveRoots()` and `findProjects()` expose the CLI's project detection. The package is ESM; Node 20.19+ and 22.12+ can also `require()` it. The `graph.json` format and these functions are the stable surface; everything else is internal.
+`analyze()` takes `backend` and `frontend` roots (either may be `null`), an optional `config` (the shape of `codemap.config.json`; `loadConfig(file, cwd)` reads one, defaults otherwise) and `security`, and returns `{ graph }`: exactly what the CLI writes to `graph.json`, with TypeScript types for every field. `resolveRoots()` and `findProjects()` expose the CLI's project detection, and `checkSchema(graph)` tells whether this version can read a `graph.json` (`SCHEMA_VERSION` is the format version it writes). The package is ESM; Node 20.19+ and 22.12+ can also `require()` it. These exports, the `graph.json` format, the command line and the config file are the public surface (see [Versioning](#versioning)); everything else is internal.
 
 ## Usage
 
@@ -264,6 +264,7 @@ The output is flat and close to the brief's format, with a few extra fields:
 
 ```jsonc
 {
+  "schemaVersion": 1,           // format version, see "Versioning"
   "meta": {
     "tool": "codemap", "version": "0.1.0",
     "backendRoot": "/abs/api", "frontendRoot": "/abs/web",
@@ -525,6 +526,17 @@ Firefly's unknowns without config come from its own middleware: a global `Secure
 
 The rest of the difference is keeping syntax nodes and scopes alive for the lens, and computing line ranges, which only happens with the flag. HomesPH costs the most because every handler and server action has its helpers followed up to three calls deep, looking for a check that throws; a lower limit would be faster but would miss real checks. **Without the flag**, `graph.json` is byte-identical to the build before the lens existed (apart from timestamps and timings) on all five original benchmarks. On HomesPH the only difference is the base-path inference described under matching, which does not depend on the flag; flag-off and flag-on output there differ only by the `security` key and `endLine`. Timing is unchanged within run-to-run noise: medians of 6 interleaved runs on Firefly III were 2.31 s before the lens and 2.30 s without the flag now.
 
+## Versioning
+
+Releases follow semantic versioning over a defined public surface: the command line (options, behavior, exit codes), the `codemap.config.json` keys, the `graph.json` format (fields and their meaning, node and finding ID formats, sort order) and the programmatic API (what the package exports). The viewer's interface, the terminal summary and the wording of messages are not part of it. [`docs/PUBLISHING.md`](docs/PUBLISHING.md#5-versioning) has the full definition.
+
+* **Major** (from 1.0): something in the surface is removed, renamed or changes meaning.
+* **Minor:** additions, and changes where **results may differ**: better detection, a resolver fix or a new security heuristic changes edges, protection states or findings for unchanged code. The format stays the same, but runs of two versions are not directly comparable, so the [changelog](CHANGELOG.md) lists every such change under "Results may differ".
+* **Patch:** fixes that leave `graph.json` the same for the same code, apart from the per-run fields (`generatedAt`, `durationMs`, `timings`, the absolute roots).
+* **Before 1.0**, breaking changes bump the minor (0.1 → 0.2), and the changelog marks them **Breaking:**.
+
+`graph.json` starts with `schemaVersion`, an integer separate from the tool version in `meta.version`: it increases only when the format changes incompatibly, never for additions. The viewer checks it with `checkSchema()` and explains a file from another format version instead of drawing it. To compare runs over time, as CI would, pin the version (`npx codemap@<version>`).
+
 ## Known limitations (deliberate)
 
 * **No type inference** beyond declared PHP property, constructor-promoted and parameter types:
@@ -584,7 +596,7 @@ Pan and zoom stay smooth because Cytoscape hides edges and uses a texture during
 ## Tests
 
 ```bash
-npm test          # vitest: 109 tests
+npm test          # vitest: 119 tests
 npm run typecheck
 ```
 
@@ -600,6 +612,7 @@ npm run typecheck
 * `test/portability.test.ts`: a copy of the security fixtures as a Windows checkout would have them (`\r\n` line ends, byte-order marks on JSON and sources) gives the same `graph.json`.
 * `test/route.test.ts`: viewer edge routing (brackets within a column, nesting, channels between columns, shared arrowheads, straight edges, widening, and the Cytoscape weights/distances giving back the same points).
 * `test/base-path.test.ts`: backend base paths from config, from `process.env.X || "http://host/api"` fallbacks, and inferred project-wide.
+* `test/versioning.test.ts`: the version in `package.json` is the one the API, the CLI and `graph.json` report; `graph.json` starts with `schemaVersion`; `checkSchema()` accepts the current format and explains newer, older, missing and invalid ones; the changelog check that guards `npm version` and `npm publish`.
 * `test/findings.test.ts`: SARIF reading (rules, levels, severities, message strings, artifacts, suppressions, unreadable files), path matching (exact, suffix, absolute, `file://`, ambiguous, outside), placement on the innermost definition, endpoint/caller/page context, stable ids, and every local check hit and non-hit on the fixtures.
 
 ### Fixtures
@@ -628,6 +641,8 @@ npm run typecheck
 src/
   cli.ts            CLI (commander), summary, server start
   analyze.ts        pipeline orchestration + timings + stats (no UI)
+  index.ts          programmatic API (the package entry)
+  schema.ts         graph.json format version and checkSchema(), shared with the viewer (served as /schema.js)
   detect.ts         Laravel/Next.js detection, composer.json, tsconfig paths
   scan.ts           fast-glob + ignore (.gitignore aware)
   parse.ts          Tree-sitter parsers and query loader
@@ -648,8 +663,11 @@ viewer/             no build step: index.html, style.css (design tokens, both th
                     panel.js (side panel + tooltip), minimap.js
 fixtures/           laravel-api/, next-web/, laravel-security/, next-security/, sarif/
 test/               vitest suites
-scripts/            copy-assets.mjs (copies .scm queries into dist/)
-docs/               screenshots
+scripts/            copy-assets.mjs (.scm queries into dist/), vendor-native.mjs (parsers into dist/native),
+                    check-release.mjs (changelog check for npm version/publish), rename.mjs, build-linux-binding.sh
+native-prebuilds/   rebuilt parser binaries that replace broken upstream ones (see its README)
+docs/               PUBLISHING.md (owner's release checklist and versioning policy), screenshots
+CHANGELOG.md        changes per release, including "Results may differ"
 ```
 
 ## Decisions where the brief was open
