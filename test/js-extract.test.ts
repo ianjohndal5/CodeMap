@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { extractJs, type JsFileInfo, type JsHttpCandidate } from '../src/lang/js/extract.js';
 import { nextFileInfo } from '../src/lang/js/next.js';
@@ -213,11 +216,15 @@ describe('module resolution', () => {
   });
 
   it('tells excluded files and imports outside the project from broken imports', () => {
-    const root = new URL('../fixtures/next-web', import.meta.url).pathname;
+    // On disk but not among the scanned files (as when .gitignore'd or excluded by config).
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'codemap-excluded-'));
+    fs.mkdirSync(path.join(root, 'src', 'generated'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'src', 'generated', 'ignored.ts'), 'export const x = 1;\n');
     const rx = new ModuleResolver(new Set(['src/app/page.tsx']), { baseDir: '', hasBaseUrl: false, paths: [{ pattern: '@/*', targets: ['./src/*'] }] }, root);
-    expect(rx.resolve('src/app/page.tsx', '@/generated/ignored')).toEqual({ kind: 'excluded' }); // exists, but .gitignore'd
+    expect(rx.resolve('src/app/page.tsx', '@/generated/ignored')).toEqual({ kind: 'excluded' });
     expect(rx.resolve('src/app/page.tsx', '../../../packages/shared/env')).toEqual({ kind: 'external' }); // climbs out of the project
     expect(rx.resolve('src/app/page.tsx', '@/nope')).toEqual({ kind: 'unresolved' });
+    fs.rmSync(root, { recursive: true, force: true });
   });
 
   it('supports baseUrl imports', () => {

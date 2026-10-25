@@ -45,21 +45,23 @@ describe('SARIF reading', () => {
 });
 
 describe('SARIF path matching', () => {
-  const roots = { backend: '/repo/api', frontend: '/repo/web' };
+  // Native absolute paths: on Windows these are D:\\repo\\api ..., and file:// URIs carry the drive letter.
+  const roots = { backend: path.resolve('/repo/api'), frontend: path.resolve('/repo/web') };
+  const abs = (side: 'backend' | 'frontend', rel: string) => path.join(roots[side], rel);
   const files = { backend: new Set(['app/Http/Controllers/UserController.php', 'routes/api.php']), frontend: new Set(['src/app/page.tsx', 'src/lib/api.ts']) };
 
   it('matches exact, suffix, absolute and file:// locations', () => {
     expect(matchFile('routes/api.php', roots, files)).toEqual({ side: 'backend', rel: 'routes/api.php' });
     expect(matchFile('./src/lib/api.ts', roots, files)).toEqual({ side: 'frontend', rel: 'src/lib/api.ts' });
     expect(matchFile('api/app/Http/Controllers/UserController.php', roots, files)).toEqual({ side: 'backend', rel: 'app/Http/Controllers/UserController.php' });
-    expect(matchFile('/repo/web/src/app/page.tsx', roots, files)).toEqual({ side: 'frontend', rel: 'src/app/page.tsx' });
-    expect(matchFile('file:///repo/api/routes/api.php', roots, files)).toEqual({ side: 'backend', rel: 'routes/api.php' });
+    expect(matchFile(abs('frontend', 'src/app/page.tsx'), roots, files)).toEqual({ side: 'frontend', rel: 'src/app/page.tsx' });
+    expect(matchFile(pathToFileURL(abs('backend', 'routes/api.php')).href, roots, files)).toEqual({ side: 'backend', rel: 'routes/api.php' });
     expect(matchFile('src/app/page%2Etsx', roots, files)).toEqual({ side: 'frontend', rel: 'src/app/page.tsx' });
   });
 
   it('explains what it cannot place', () => {
-    expect(matchFile('/repo/api/vendor/x.php', roots, files)).toEqual({ reason: 'file not among the analyzed sources' });
-    expect(matchFile('/elsewhere/x.php', roots, files)).toEqual({ reason: 'outside both projects' });
+    expect(matchFile(abs('backend', 'vendor/x.php'), roots, files)).toEqual({ reason: 'file not among the analyzed sources' });
+    expect(matchFile(path.resolve('/elsewhere/x.php'), roots, files)).toEqual({ reason: 'outside both projects' });
     expect(matchFile('https://example.com/x.js', roots, files)).toEqual({ reason: 'non-file URI' });
     const twins = { backend: new Set(['a/util.ts']), frontend: new Set(['b/util.ts']) };
     expect(matchFile('util.ts', roots, twins)).toEqual({ reason: 'ambiguous path (2 candidates)' });

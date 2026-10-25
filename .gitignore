@@ -1,6 +1,7 @@
 node_modules/
-dist/
-.codemap/
-legacy/
-homes/
-rentalsph/
+/dist/
+/.codemap/
+# Local projects analyzed while developing (anchored: fixtures contain directories with these names)
+/legacy/
+/homes/
+/rentalsph/

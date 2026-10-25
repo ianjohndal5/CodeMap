@@ -41,11 +41,17 @@ const MULTILINE = `export async function report(id: string) {
 }
 `;
 
-/** graph.json without what legitimately differs between machines: timestamps, timings and absolute roots. */
+/**
+ * graph.json without what legitimately differs between machines: timestamps, timings and the absolute root,
+ * in each form it takes in the JSON (meta roots use forward slashes; warnings quote native paths, which
+ * JSON escapes on Windows).
+ */
 function portable(g: Graph, root: string): string {
   const { generatedAt, durationMs, timings, ...meta } = g.meta;
   void [generatedAt, durationMs, timings];
-  return JSON.stringify({ ...g, meta }).split(root).join('<root>');
+  let text = JSON.stringify({ ...g, meta });
+  for (const form of [root.split(path.sep).join('/'), JSON.stringify(root).slice(1, -1)]) text = text.split(form).join('<root>');
+  return text;
 }
 
 describe('portability', () => {
