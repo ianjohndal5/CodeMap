@@ -24,7 +24,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
-      - run: npm pack --pack-destination dist-pack
+      # npm pack does not create the destination directory.
+      - run: mkdir -p dist-pack && npm pack --pack-destination dist-pack
       - name: Reference graphs (fixtures, analyzed from the repo build)
         run: |
           mkdir -p ref
@@ -71,7 +72,7 @@ jobs:
           - { os: ubuntu-24.04-arm, node: 24, pm: pnpm }
           - { os: macos-latest, node: 20, pm: npm }
           - { os: macos-latest, node: 24, pm: pnpm }
-          - { os: macos-13, node: 22, pm: npm }
+          - { os: macos-15-intel, node: 22, pm: npm } # macOS on x64
           - { os: windows-latest, node: 20, pm: npm }
           - { os: windows-latest, node: 24, pm: npm }
           - { os: windows-latest, node: 24, pm: pnpm }
@@ -91,7 +92,9 @@ jobs:
           path: pkg
       - name: Install into a clean project outside the checkout
         run: |
-          tgz="$(ls "$GITHUB_WORKSPACE"/pkg/*.tgz)"
+          # The tarball's native path (no shell globbing on Windows paths).
+          tgz="$(node -p "const p = require('path'), d = p.join(process.env.GITHUB_WORKSPACE, 'pkg'); p.join(d, require('fs').readdirSync(d).find((f) => f.endsWith('.tgz')))")"
+          echo "TGZ=$tgz" >> "$GITHUB_ENV"
           mkdir -p "$RUNNER_TEMP/consumer" && cd "$RUNNER_TEMP/consumer"
           echo '{"name":"consumer","version":"1.0.0","private":true}' > package.json
           if [ "${{ matrix.pm }}" = pnpm ]; then
@@ -114,7 +117,7 @@ jobs:
       - name: Global install
         if: matrix.pm == 'npm'
         run: |
-          npm install -g "$(ls "$GITHUB_WORKSPACE"/pkg/*.tgz)"
+          npm install -g "$TGZ"
           codemap --version
       - uses: actions/upload-artifact@v4
         with:
