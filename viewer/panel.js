@@ -1,6 +1,7 @@
 // HTML for the side panel (Inspect / Insights / Security / Filters) and the hover tooltip.
 
 import { icon } from './icons.js';
+import { inWebview } from './host.js';
 import { descendants, displayName, editorUrl, groupKey, iconOf, locationOf } from './model.js';
 import { GROUPS, GROUP_ORDER, LANES, SEC_LABEL, SEC_STATES, laneOf, methodBadge, methodColor } from './theme.js';
 
@@ -95,6 +96,9 @@ const toReview = (e) => e.state === 'none' || e.state === 'unknown' || e.review.
 export function suggestedStart(app) {
   const { M } = app;
   const sec = M.graph.security;
+  // A few middleware keeping a quarter or more of all endpoints unknown: classifying them comes before any trace.
+  const lead = sec?.classifyFirst;
+  if (lead && lead.endpoints * 4 >= sec.endpoints.length) return { classify: lead, why: `${lead.middleware.length} middleware keep ${lead.endpoints} endpoints unknown` };
   const top = sec ? reviewSort(sec.endpoints.filter(toReview))[0] : null;
   if (top) return { id: top.id, why: `First on the security review list: ${top.review[0] ?? SEC_LABEL[top.state].toLowerCase()}` };
   const busiest = busiestEndpoints(M)[0];
@@ -129,13 +133,19 @@ export function renderInspectEmpty(app) {
       } Everything comes from parsing the source.</p>
     </div>
     ${
-      start
+      start?.classify
         ? `<div class="card start-card">
+        <div class="card-title">${icon('target', 13)} Start with</div>
+        <p class="start-text"><b>Classify ${start.classify.middleware.length} middleware</b> to resolve ${fmt(start.classify.endpoints)} of the ${fmt(M.graph.security.summary.unknown)} unknown endpoints. CodeMap doesn't guess what custom middleware does.</p>
+        <button class="btn primary" data-goto-tab="security">${icon('shield', 14)} Show them</button>
+      </div>`
+        : start
+          ? `<div class="card start-card">
         <div class="card-title">${icon('target', 13)} Start with</div>
         ${nodeRow(app, start.id, { sub: start.why })}
         <button class="btn primary" data-action="start" data-id="${esc(start.id)}">${icon('flow', 14)} Trace its chain</button>
       </div>`
-        : ''
+          : ''
     }
     <div class="tiles tiles-3">
       ${tile('Files', fmt(s.files), `${fmt(M.graph.nodes.filter((n) => n.kind === 'file' && n.side === 'backend').length)} PHP · ${fmt(M.graph.nodes.filter((n) => n.kind === 'file' && n.side === 'frontend').length)} JS/TS`)}
@@ -203,7 +213,7 @@ export function renderInspectNode(app, id) {
       ${chips.length ? `<div class="chips">${chips.map((c) => `<span class="chip">${esc(c)}</span>`).join('')}</div>` : ''}
     </div>
     <div class="actions">
-      ${url ? `<a class="btn primary" href="${esc(url)}">${icon('external', 14)} Open in VS Code</a>` : ''}
+      ${url ? `<a class="btn primary" href="${esc(url)}">${icon('external', 14)} ${inWebview ? 'Open file' : 'Open in VS Code'}</a>` : ''}
       <button class="btn" data-action="isolate" aria-pressed="${state.isolated}">${icon('target', 14)} ${state.isolated ? 'Exit isolate' : 'Isolate'}</button>
       ${canExpand ? `<button class="btn" data-action="expand" data-id="${esc(id)}">${icon(state.expanded.has(id) ? 'collapse' : 'expand', 14)} ${state.expanded.has(id) ? 'Collapse' : 'Expand'}</button>` : ''}
       ${n.parent ? `<button class="btn ghost" data-reveal="${esc(M.topOf.get(id))}">${icon('file', 14)} File</button>` : ''}
@@ -405,6 +415,11 @@ function renderProtection(app, ep) {
   </div>`;
 }
 
+/** The "security" part of a config: unresolved names under ignoreMiddleware, for the user to move (as the CLI prints it). */
+function configSnippet(names) {
+  return JSON.stringify({ security: { ignoreMiddleware: names, authMiddleware: [], authorizationMiddleware: [], publicMiddleware: [] } }, null, 2);
+}
+
 /** The Security tab: distribution, endpoints to review, what kept things unknown, and what is not checked. */
 export function renderSecurity(app) {
   const { state, theme } = app;
@@ -460,10 +475,30 @@ export function renderSecurity(app) {
       )
     : '';
   const unresolved = sec.middleware.unresolved.filter((u) => u.decisive > 0).slice(0, 12);
-  const snippet = unresolved.length
-    ? JSON.stringify({ security: { ignoreMiddleware: [], authMiddleware: [], authorizationMiddleware: [], publicMiddleware: [] } }, null, 2).replace('"ignoreMiddleware": []', `"ignoreMiddleware": [${unresolved.map((u) => `
-      ${JSON.stringify(u.name)}`).join(',')}
-    ]`)
+  const snippet = unresolved.length ? configSnippet(unresolved.map((u) => u.name)) : '';
+  const meta = app.meta;
+  const configWhere = meta.config
+    ? `<code>${esc(meta.config.path)}</code> (relative to the ${meta.backendRoot ? 'backend' : 'frontend'} root)`
+    : `a new <code>codemap.config.json</code> in the ${meta.backendRoot ? 'backend' : 'frontend'} root`;
+  // When a few middleware are all that keeps most unknowns unknown, that comes first (it never changes a state itself).
+  const lead = sec.classifyFirst;
+  const leadSnippet = lead ? configSnippet(lead.middleware) : '';
+  const leadBlock = lead
+    ? `<div class="card start-card lead-card">
+      <div class="card-title">${icon('target', 13)} First step</div>
+      <p class="start-text"><b>Classify ${lead.middleware.length} middleware</b> to resolve <b>${fmt(lead.endpoints)} of the ${fmt(sec.summary.unknown)}</b> unknown endpoints. Read each one, then list it in ${configWhere}.</p>
+      ${lead.middleware
+        .map((name) => {
+          const u = sec.middleware.unresolved.find((r) => r.name === name);
+          return `<div class="issue"><div class="mono small">${esc(name)}</div>
+            <div class="issue-foot"><span class="reason">on ${fmt(u?.decisive ?? 0)} unknown endpoints</span></div>
+            ${u?.hint ? `<p class="note">${esc(u.hint)}</p>` : ''}</div>`;
+        })
+        .join('')}
+      <div class="snippet-head"><span class="mono small">codemap.config.json</span><button class="icon-btn sm" data-copy="${esc(leadSnippet)}" title="Copy">${icon('copy', 13)}</button></div>
+      <pre class="snippet">${esc(leadSnippet)}</pre>
+      <p class="muted small">Move each name to the list that matches what it does. States change only once you classify them: CodeMap never decides from a name.</p>
+    </div>`
     : '';
   return `
     <div class="hero sec-hero">
@@ -472,6 +507,7 @@ export function renderSecurity(app) {
       <p>A review aid: what the code declares about access to each endpoint${actions.length ? ' and server action' : ''}. It shows where to look and certifies nothing. Every state links to the signals it is based on.</p>
       <label class="switch-row inline"><span class="switch-label">Colour cards by state</span><input type="checkbox" data-sec-lens ${state.secLens ? 'checked' : ''}><span class="switch"></span></label>
     </div>
+    ${leadBlock}
     <div class="card">
       <div class="card-title">Endpoints <span class="muted">${fmt(sec.endpoints.length)}</span></div>
       <div class="bar">${barOf(sec.summary, sec.endpoints.length)}</div>
@@ -490,7 +526,7 @@ export function renderSecurity(app) {
       'Classify to resolve unknowns',
       unresolved.map(
         (u) => `<div class="issue"><div class="mono small">${esc(u.name)}</div>
-          <div class="issue-foot"><span class="reason">${esc(u.reason)} · decides ${fmt(u.decisive)} of ${fmt(u.endpoints)} endpoints</span></div>
+          <div class="issue-foot"><span class="reason">${esc(u.reason)} · on ${fmt(u.decisive)} unknown endpoints (${fmt(u.endpoints)} in all)</span></div>
           ${u.hint ? `<p class="note">${esc(u.hint)}</p>` : ''}</div>`,
       ),
       { open: unresolved.length > 0, empty: 'Nothing to classify.' },
@@ -542,7 +578,7 @@ function findingRow(app, f, { here = false } = {}) {
     <div class="finding-head"><span class="level">${esc(f.level)}${f.severity !== undefined ? ' ' + f.severity.toFixed(1) : ''}</span>
       <span class="finding-rule" title="${esc(f.ruleId)}">${esc(f.title ?? f.ruleId)}</span>${f.suppressed ? '<span class="tag">suppressed</span>' : ''}</div>
     <div class="finding-msg">${esc(f.message)}</div>
-    <div class="finding-foot"><span class="mono">${esc(loc)}</span><span class="muted">${esc(who)}</span>${link ? `<a href="${esc(link)}" title="Open in VS Code">${icon('external', 12)}</a>` : ''}</div>
+    <div class="finding-foot"><span class="mono">${esc(loc)}</span><span class="muted">${esc(who)}</span>${link ? `<a href="${esc(link)}" title="${inWebview ? 'Open file' : 'Open in VS Code'}">${icon('external', 12)}</a>` : ''}</div>
     <div class="finding-reach">${worst ? `<span class="sec-dot" style="--s:${app.theme.security[worst]}"></span>` : ''}<span>${esc(reach)}</span>
       <span class="spacer"></span>
       ${f.node && !here ? `<button class="link-btn" data-reveal="${esc(f.node)}">show</button>` : ''}

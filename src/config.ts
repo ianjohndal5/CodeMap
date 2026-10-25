@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { CONFIG_FILE } from './brand.js';
@@ -60,6 +61,8 @@ export interface CodemapConfig {
   laravel: LaravelOptions;
   next: NextOptions;
   security: SecurityOptions;
+  /** The file these settings were read from (set by loadConfig): graph.json records it in meta.config. */
+  source?: { file: string; sha256: string };
 }
 
 export function defaultConfig(): CodemapConfig {
@@ -96,10 +99,106 @@ function optString(v: unknown, what: string): string | undefined {
   return v;
 }
 
+/** Where the config search starts: a project root (or the monorepo root, or the current folder), named for people. */
+export interface ConfigStart {
+  dir: string;
+  /** "backend root", "frontend root", "monorepo root", "current folder". */
+  label: string;
+  /** Set for project roots: a config whose `backend` / `frontend` names this folder is preferred. */
+  role?: 'backend' | 'frontend';
+}
+
+export interface ConfigLookup {
+  /** The config file to use, or null for the defaults. */
+  file: string | null;
+  /** Why this file, for people: "in the frontend root", "1 folder above the frontend root; it names these projects", or "none found". */
+  how: string;
+  /** The folders looked in, in order. */
+  searched: string[];
+  /** Config files found from another start but not used. */
+  others: string[];
+}
+
+/** The folders a search from `start` covers: up to its repository root (the first folder with .git), else up to `outside`. */
+function searchChain(start: string, outside: string): string[] {
+  const chain: string[] = [];
+  for (let dir = start; ; dir = path.dirname(dir)) {
+    chain.push(dir);
+    if (fs.existsSync(path.join(dir, '.git'))) return chain;
+    if (path.dirname(dir) === dir) break;
+  }
+  // Not in a git repository: stop at the folder that holds all the projects being analyzed.
+  const stop = chain.indexOf(outside);
+  return chain.slice(0, stop === -1 ? 1 : stop + 1);
+}
+
+/** The deepest folder containing every path (a filesystem root when they share none, e.g. two Windows drives). */
+function commonAncestor(dirs: string[]): string {
+  let common = dirs[0]!;
+  const inside = (d: string) => {
+    const rel = path.relative(common, d);
+    return !rel.startsWith('..') && !path.isAbsolute(rel);
+  };
+  for (const d of dirs.slice(1)) while (!inside(d) && path.dirname(common) !== common) common = path.dirname(common);
+  return common;
+}
+
+/** How many of the project roots a config file names in its `backend` / `frontend` (0 when it can't be read). */
+function namedRoots(file: string, starts: ConfigStart[]): number {
+  let raw: Record<string, unknown>;
+  try {
+    raw = parseJsonc(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
+  } catch {
+    return 0;
+  }
+  const dir = path.dirname(file);
+  return starts.filter((s) => s.role && typeof raw[s.role] === 'string' && path.relative(path.resolve(dir, raw[s.role] as string), path.resolve(s.dir)) === '').length;
+}
+
 /**
- * Load codemap.config.json. `explicit` is the --config path; otherwise the file is
- * looked up in the current directory and silently skipped when absent.
- * Relative backend/frontend paths are resolved against the config file's directory.
+ * The config file that belongs to the projects, independent of the current directory: the nearest
+ * codemap.config.json in or above each start folder, up to the repository root (outside a git repository, up
+ * to the folder holding all the starts). When several starts find different files, the one whose `backend` /
+ * `frontend` names the most of the projects wins, then the closest, then the earlier start (backend first).
+ */
+export function findConfig(starts: ConfigStart[]): ConfigLookup {
+  const outside = commonAncestor(starts.map((s) => path.resolve(s.dir)));
+  const searched: string[] = [];
+  const found: { file: string; distance: number; order: number; start: ConfigStart; names: number }[] = [];
+  for (const [order, start] of starts.entries()) {
+    const chain = searchChain(path.resolve(start.dir), outside);
+    for (const [distance, dir] of chain.entries()) {
+      if (!searched.includes(dir)) searched.push(dir);
+      const file = path.join(dir, CONFIG_FILE);
+      if (fs.existsSync(file) && fs.statSync(file).isFile()) {
+        if (!found.some((f) => f.file === file)) found.push({ file, distance, order, start, names: 0 });
+        break;
+      }
+    }
+  }
+  if (!found.length) return { file: null, how: 'none found', searched, others: [] };
+  if (found.length > 1) for (const f of found) f.names = namedRoots(f.file, starts);
+  found.sort((a, b) => b.names - a.names || a.distance - b.distance || a.order - b.order);
+  const best = found[0]!;
+  let how = best.distance === 0 ? `in the ${best.start.label}` : `${best.distance} folder${best.distance === 1 ? '' : 's'} above the ${best.start.label}`;
+  if (found.length > 1) how += best.names > found[1]!.names ? '; it names these projects' : best.distance < found[1]!.distance ? '; the closest' : '; as close as another, and the backend comes first';
+  return { file: best.file, how, searched, others: found.slice(1).map((f) => f.file) };
+}
+
+/** JSON with object keys sorted at every level, so that equal settings give equal text. */
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const keys = Object.keys(value).sort();
+    return `{${keys.map((k) => `${JSON.stringify(k)}:${canonical((value as Record<string, unknown>)[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+/**
+ * Load codemap.config.json. `explicit` is a path (relative to `cwd`) that must exist; without it, the file in
+ * `cwd` is used when present (the CLI picks the file with findConfig instead). Relative paths inside it resolve
+ * against the config file's directory.
  */
 export function loadConfig(explicit: string | undefined, cwd: string): { config: CodemapConfig; file: string | null } {
   const config = defaultConfig();
@@ -114,6 +213,8 @@ export function loadConfig(explicit: string | undefined, cwd: string): { config:
   } catch (e) {
     throw new Error(`Could not parse ${file}: ${(e as Error).message}`);
   }
+  // The parsed settings, not the bytes: comments, formatting, key order and line endings don't change it.
+  config.source = { file, sha256: createHash('sha256').update(canonical(raw)).digest('hex') };
   const dir = path.dirname(file);
   const backend = optString(raw.backend, 'backend');
   const frontend = optString(raw.frontend, 'frontend');

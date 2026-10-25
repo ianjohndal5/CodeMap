@@ -99,6 +99,12 @@ export interface SecurityReport {
   summary: Record<ProtectionState, number>;
   /** Why endpoints stayed unknown, most common first. One endpoint can have several reasons. */
   unknownReasons: { reason: string; label: string; endpoints: number }[];
+  /**
+   * The most useful first step when a few middleware (at most 5, from `middleware.unresolved`) are all that keeps
+   * a majority of the unknown endpoints unknown: classifying them in the config gives those `endpoints` a state.
+   * Null otherwise. Presentation only: states never change without the user's classification.
+   */
+  classifyFirst: { middleware: string[]; endpoints: number } | null;
   endpoints: EndpointSecurity[];
   middleware: {
     aliases: { name: string; target: string; source: string }[];

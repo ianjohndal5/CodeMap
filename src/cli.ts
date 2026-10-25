@@ -5,7 +5,8 @@ import path from 'node:path';
 import { Command } from 'commander';
 import { analyze } from './analyze.js';
 import { COMMAND, CONFIG_FILE, DISPLAY_NAME, OUT_DIR, VERSION } from './brand.js';
-import { loadConfig } from './config.js';
+import { defaultConfig, findConfig, loadConfig } from './config.js';
+import type { ConfigLookup, ConfigStart } from './config.js';
 import { resolveRoots } from './detect.js';
 import { serve } from './server.js';
 import type { Graph } from './types.js';
@@ -35,13 +36,19 @@ function openBrowser(url: string): void {
   }
 }
 
-function printSummary(graph: Graph, outFile: string): void {
+function printSummary(graph: Graph, outFile: string, lookup: ConfigLookup, cwd: string): void {
   const { stats, timings, durationMs, backendRoot, frontendRoot } = graph.meta;
   const line = (label: string, value: string | number) => console.log(`  ${label.padEnd(22)} ${value}`);
+  // Relative to where the command ran, unless that is longer than the absolute path.
+  const shown = (p: string) => {
+    const rel = path.relative(cwd, p) || '.';
+    return rel.length <= p.length ? rel : p;
+  };
   console.log('');
   console.log(`${DISPLAY_NAME} ${VERSION}`);
   line('backend', backendRoot ?? '(none)');
   line('frontend', frontendRoot ?? '(none)');
+  line('config', lookup.file ? `${shown(lookup.file)} (${lookup.how})` : `none, defaults used (looked for ${CONFIG_FILE} in ${lookup.searched.map(shown).join(', ')})`);
   line('files', stats.files);
   line('definitions', stats.definitions);
   line('edges', `${stats.edges} (${stats.uncertainEdges} uncertain)`);
@@ -56,7 +63,7 @@ function printSummary(graph: Graph, outFile: string): void {
   console.log(
     `  timings (ms)           scan ${timings.scan} | parse ${timings.parse} | extract ${timings.extract} | resolve ${timings.resolve} | link ${timings.link}${timings.security !== undefined ? ` | security ${timings.security}` : ''} | total ${durationMs}`,
   );
-  if (graph.security) printSecurity(graph.security);
+  if (graph.security) printSecurity(graph.security, lookup.file ? shown(lookup.file) : `a new ${CONFIG_FILE} in the ${backendRoot ? 'backend' : 'frontend'} root`);
   line('graph', outFile);
   const warnings = graph.meta.warnings;
   if (warnings.length) {
@@ -66,12 +73,28 @@ function printSummary(graph: Graph, outFile: string): void {
   }
 }
 
-function printSecurity(sec: NonNullable<Graph['security']>): void {
+/** The "security" part of a config, unresolved names under ignoreMiddleware for the user to move (as in the viewer). */
+function configSnippet(names: string[]): string {
+  return JSON.stringify({ security: { ignoreMiddleware: names, authMiddleware: [], authorizationMiddleware: [], publicMiddleware: [] } }, null, 2);
+}
+
+function printSecurity(sec: NonNullable<Graph['security']>, configWhere: string): void {
   const s = sec.summary;
   console.log('\nSecurity lens (review aid: shows where to look, certifies nothing)');
+  // When a few middleware are all that keeps most unknowns unknown, that is the step to take first.
+  const lead = sec.classifyFirst;
+  if (lead) {
+    console.log(`  First step: classify ${lead.middleware.length} middleware to resolve ${lead.endpoints} of the ${s.unknown} unknown endpoints. Read each one, then list it in ${configWhere}:`);
+    for (const name of lead.middleware) {
+      const u = sec.middleware.unresolved.find((r) => r.name === name);
+      console.log(`    ${name} (on ${u?.decisive ?? 0} unknown endpoints)${u?.hint ? ` - ${u.hint}` : ''}`);
+    }
+    for (const l of configSnippet(lead.middleware).split('\n')) console.log(`      ${l}`);
+    console.log('    Move each name to the list that matches what it does. States change only once you classify them.');
+  }
   console.log(`  authorization check seen ${s.authorization} | authenticated ${s.authenticated} | signed URL ${s.signed} | public (guest) ${s.public} | unknown ${s.unknown} | no protection found ${s.none}`);
   for (const r of sec.unknownReasons.slice(0, 5)) console.log(`  unknown: ${r.endpoints} x ${r.label}`);
-  const top = sec.middleware.unresolved.filter((u) => u.decisive > 0).slice(0, 5);
+  const top = lead ? [] : sec.middleware.unresolved.filter((u) => u.decisive > 0).slice(0, 5);
   if (top.length) {
     console.log(`  classify these in ${CONFIG_FILE} "security" to resolve unknowns:`);
     for (const u of top) console.log(`    ${u.name} (${u.decisive} endpoint(s))${u.hint ? ` - ${u.hint}` : ''}`);
@@ -95,7 +118,7 @@ async function main(): Promise<void> {
     .argument('[root]', 'monorepo root containing both projects (auto-detected)')
     .option('-b, --backend <path>', 'Laravel project root')
     .option('-f, --frontend <path>', 'Next.js project root')
-    .option('-c, --config <file>', `config file (default: ./${CONFIG_FILE} if present)`)
+    .option('-c, --config <file>', `config file (default: the nearest ${CONFIG_FILE} in or above the projects)`)
     .option('-o, --out <dir>', 'output directory for graph.json', OUT_DIR)
     .option('-p, --port <n>', 'viewer port', '5178')
     .option('--no-open', 'do not open the browser')
@@ -109,13 +132,27 @@ async function main(): Promise<void> {
   const root = program.args[0];
   const cwd = process.cwd();
 
-  const { config, file: configFile } = loadConfig(opts.config, cwd);
-  const warnings: string[] = [];
-  if (configFile) console.log(`Using config ${configFile}`);
-  const roots = resolveRoots({
-    backend: opts.backend ? path.resolve(cwd, opts.backend) : config.backend,
-    frontend: opts.frontend ? path.resolve(cwd, opts.frontend) : config.frontend,
+  const named = {
+    backend: opts.backend ? path.resolve(cwd, opts.backend) : undefined,
+    frontend: opts.frontend ? path.resolve(cwd, opts.frontend) : undefined,
     root: root ? path.resolve(cwd, root) : undefined,
+  };
+  // The config that belongs to the named projects, wherever the command runs (README: Configuration).
+  const starts: ConfigStart[] = [];
+  if (named.backend) starts.push({ dir: named.backend, label: 'backend root', role: 'backend' });
+  if (named.frontend) starts.push({ dir: named.frontend, label: 'frontend root', role: 'frontend' });
+  if (named.root) starts.push({ dir: named.root, label: 'monorepo root' });
+  if (!starts.length) starts.push({ dir: cwd, label: 'current folder' });
+  const lookup: ConfigLookup = opts.config
+    ? { file: path.resolve(cwd, opts.config), how: 'given with --config', searched: [], others: [] }
+    : findConfig(starts);
+  const { config } = lookup.file ? loadConfig(lookup.file, cwd) : { config: defaultConfig() };
+  const warnings: string[] = [];
+  for (const other of lookup.others) warnings.push(`Also found ${other}, not used (see "config" above; pass --config to choose).`);
+  const roots = resolveRoots({
+    backend: named.backend ?? config.backend,
+    frontend: named.frontend ?? config.frontend,
+    root: named.root,
   });
   warnings.push(...roots.warnings);
 
@@ -134,7 +171,7 @@ async function main(): Promise<void> {
   fs.mkdirSync(outDir, { recursive: true });
   const outFile = path.join(outDir, 'graph.json');
   fs.writeFileSync(outFile, JSON.stringify(graph, null, 1));
-  printSummary(graph, outFile);
+  printSummary(graph, outFile, lookup, cwd);
 
   if (opts.jsonOnly || opts.list) return;
   const port = Number.parseInt(opts.port, 10);

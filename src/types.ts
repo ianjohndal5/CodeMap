@@ -15,6 +15,8 @@ export interface AnalyzeOptions {
   warnings?: string[];
   /** Run the security lens and add `security` to the graph. */
   security?: boolean;
+  /** Called as each stage starts (for progress: the editor extension shows it). */
+  onStage?: (stage: keyof Timings) => void;
 }
 
 export type NodeKind =
@@ -127,6 +129,12 @@ export interface Graph {
     version: string;
     backendRoot: string | null;
     frontendRoot: string | null;
+    /**
+     * The config file used, or null for the defaults. `path` is relative to the backend root (the frontend root
+     * without a backend), with / separators; `sha256` hashes its parsed settings, so comments, formatting and
+     * line endings don't change it.
+     */
+    config: { path: string; sha256: string } | null;
     generatedAt: string;
     durationMs: number;
     timings: Timings;

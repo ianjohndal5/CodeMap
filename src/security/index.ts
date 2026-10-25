@@ -157,6 +157,10 @@ export function analyzeSecurity(graph: Graph, adapters: Adapter[], options: Secu
     }
   }
 
+  const unresolvedRows = [...unresolved.values()]
+    .map((u) => ({ name: u.name, reason: u.reason, endpoints: u.endpoints.size, decisive: u.decisive.size, ...(u.hint ? { hint: u.hint } : {}) }))
+    .sort((a, b) => b.decisive - a.decisive || b.endpoints - a.endpoints || (a.name < b.name ? -1 : 1));
+
   const caveats: string[] = [];
   const registry = lens?.registry;
   if (laravel) {
@@ -213,10 +217,9 @@ export function analyzeSecurity(graph: Graph, adapters: Adapter[], options: Secu
       global: lens
         ? lens.globalLeaves().map(({ ref, leaves }) => ({ name: ref.name ?? ref.text, effect: strongest(leaves.map((l) => l.effect)), detail: leaves.map((l) => l.detail).join('; ') }))
         : [],
-      unresolved: [...unresolved.values()]
-        .map((u) => ({ name: u.name, reason: u.reason, endpoints: u.endpoints.size, decisive: u.decisive.size, ...(u.hint ? { hint: u.hint } : {}) }))
-        .sort((a, b) => b.decisive - a.decisive || b.endpoints - a.endpoints || (a.name < b.name ? -1 : 1)),
+      unresolved: unresolvedRows,
     },
+    classifyFirst: classifyFirst(unresolvedRows.map((u) => u.name), [...findings.values()].filter((f) => stateOf.get(f.endpointId) === 'unknown'), summary.unknown),
     caveats,
     notChecked: NOT_CHECKED,
     findings: placedFindings,
@@ -229,6 +232,27 @@ export function analyzeSecurity(graph: Graph, adapters: Adapter[], options: Secu
       skipped: SKIPPED_RULES,
     },
   };
+}
+
+/**
+ * The first few unresolved middleware (most decisive first) that are all that keeps a majority of the unknown
+ * endpoints unknown: once each is listed in the config, every one of those endpoints gets a state. Of the first
+ * five, the shortest run that settles at least 80% of what all five would (endpoints often carry several, so the
+ * count can jump). Null when even five don't settle a majority. It ranks what to look at; it never changes a state.
+ */
+function classifyFirst(ranked: string[], unknownFindings: LaravelFindings[], unknown: number): SecurityReport['classifyFirst'] {
+  // Endpoints whose every unknown entry goes away once its middleware is classified, with those names.
+  const settleable = unknownFindings
+    .filter((f) => f.unresolved.length && f.unknown.length === f.unresolved.filter((u) => u.settles).length)
+    .map((f) => new Set(f.unresolved.map((u) => u.name)));
+  const settled = ranked.slice(0, 5).map((_, i) => {
+    const names = new Set(ranked.slice(0, i + 1));
+    return settleable.filter((s) => [...s].every((n) => names.has(n))).length;
+  });
+  const most = settled.at(-1) ?? 0;
+  if (most * 2 <= unknown) return null;
+  const k = settled.findIndex((n) => n >= most * 0.8);
+  return { middleware: ranked.slice(0, k + 1), endpoints: settled[k]! };
 }
 
 type Trees = Map<string, { root: SyntaxNode; source: string }>;

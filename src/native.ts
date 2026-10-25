@@ -21,7 +21,7 @@ export function loadNative<T>(pkg: string): T {
     const msg = (e as Error).message;
     if (/No native build was found/.test(msg)) {
       throw new Error(
-        `No prebuilt Tree-sitter parser for ${process.platform}-${process.arch}. Prebuilt: linux, macOS and Windows on x64 and arm64 (glibc Linux only). (${pkg}: ${msg.split('\n')[0]})`,
+        `No prebuilt Tree-sitter parser for ${process.platform}-${process.arch}. Prebuilt: Linux, macOS and Windows on x64 and arm64 (on Linux: glibc, and musl on x64 only). (${pkg}: ${msg.split('\n')[0]})`,
       );
     }
     throw e;

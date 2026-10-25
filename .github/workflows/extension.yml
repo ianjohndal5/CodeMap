@@ -1,0 +1,66 @@
+# The editor extension: its integration tests in a real VS Code on Linux, macOS and Windows (and on the oldest
+# VS Code its manifest accepts), the analyzer's tests on the WebAssembly parser the extension uses, and the .vsix.
+# Nothing here publishes anything.
+name: extension
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, vscode: stable }
+          - { os: macos-latest, vscode: stable }
+          - { os: windows-latest, vscode: stable }
+          - { os: ubuntu-latest, vscode: 1.90.0 } # engines.vscode in extension/package.json
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: extension/package.json matches package.json
+        run: node scripts/extension-manifest.mjs --check
+      - name: The analyzer's tests on the WebAssembly parser
+        run: CODEMAP_PARSER=wasm npx vitest run
+      - run: npm run build
+      - run: npm ci
+        working-directory: extension
+      - run: npm run build
+        working-directory: extension
+      - name: Integration tests in VS Code ${{ matrix.vscode }}
+        working-directory: extension
+        env:
+          CODE_VERSION: ${{ matrix.vscode }}
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then xvfb-run -a npm test; else npm test; fi
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci && npm run build
+      - run: npm ci && npm run package
+        working-directory: extension
+      - name: Contents
+        working-directory: extension
+        run: npx vsce ls --tree | tail -40
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsix
+          path: dist-extension/*.vsix

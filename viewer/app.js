@@ -9,6 +9,7 @@ import { buildModel, descendants, displayName, editorUrl, groupKey, iconOf, labe
 import { esc, methodPill, renderFilters, renderInsights, renderInspectEdge, renderInspectEmpty, renderInspectNode, renderSecurity, suggestedStart, tooltipHtml } from './panel.js';
 import { computeRoutes, routeStyle } from './route.js';
 import { checkSchema } from './schema.js'; // served from dist/schema.js (src/schema.ts), shared with the API
+import { editorTheme, graphUrl, inWebview, onEditorTheme, onHostMessage, openLink, postToHost, store, testMode } from './host.js';
 import { BAND, GROUPS, GROUP_ORDER, LANES, THEMES, laneOf, methodBadge, methodColor } from './theme.js';
 
 // Below these sizes the real cards are laid out with ELK layered ("flow"); above
@@ -30,28 +31,14 @@ const SEC_CLASSES = ['sec-authorization', 'sec-authenticated', 'sec-signed', 'se
 const LANE_GUTTER = 44;
 /** Initial zoom floor for small (flow) graphs: below it labels stop being readable. */
 const READABLE_ZOOM = 0.68;
+/** Below this zoom a whole-map fit shows nothing readable: large maps open fitted to the lanes' width instead. */
+const OVERVIEW_BELOW = 0.25;
 /** Screen space kept free around a fitted graph (lane headers on top, docks below). */
 const FIT_PAD = { top: 64, bottom: 72, x: 36 };
 
 const $ = (sel) => document.querySelector(sel);
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-const store = {
-  get(k) {
-    try {
-      return localStorage.getItem(k);
-    } catch {
-      return null;
-    }
-  },
-  set(k, v) {
-    try {
-      localStorage.setItem(k, v);
-    } catch {
-      // Storage unavailable (private mode): preferences are simply not remembered.
-    }
-  },
-};
 
 /** Theme-dependent visuals of a node: accent colour and the left tab image (none for large graphs). */
 function nodeVisual(n, top, theme, large = false) {
@@ -257,10 +244,11 @@ class App {
     $('#btn-theme').innerHTML = icon(this.theme.name === 'dark' ? 'sun' : 'moon');
   }
 
-  applyTheme(name) {
+  /** `remember`: false when following the editor's theme (VS Code decides, nothing to store). */
+  applyTheme(name, remember = true) {
     this.theme = THEMES[name];
     document.documentElement.dataset.theme = name;
-    store.set('codemap.theme', name);
+    if (remember) store.set('codemap.theme', name);
     this.cy.style(stylesheet(this.theme, { large: this.large }));
     this.cy.batch(() => {
       this.cy.nodes().forEach((n) => {
@@ -404,7 +392,7 @@ class App {
     this.addLanes();
     this.hideLoading();
     if (viewport) cy.viewport(viewport);
-    else this.fitAll(false, true);
+    else this.initialView();
     this.reapplySelection();
     this.minimap.refresh();
     this.updateOverlays();
@@ -775,7 +763,16 @@ class App {
     }
     const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
     const sub = { be: plural(this.laneBoxes.be?.count ?? 0, 'file'), ep: plural(this.laneBoxes.ep?.count ?? 0, 'endpoint'), fe: plural(this.laneBoxes.fe?.count ?? 0, 'file') };
-    for (const [lane, el] of Object.entries(this.laneHeads)) el.querySelector('span:last-child').textContent = sub[lane];
+    // Natural widths, full and compact, so a header never clips its title (updateOverlays places them).
+    for (const [lane, el] of Object.entries(this.laneHeads)) {
+      el.querySelector('span:last-child').textContent = sub[lane];
+      el.hidden = false;
+      el.classList.remove('compact');
+      const full = el.offsetWidth;
+      el.classList.add('compact');
+      el.dataset.full = String(full);
+      el.dataset.compact = String(el.offsetWidth);
+    }
   }
 
   // --- viewport -------------------------------------------------------------------
@@ -803,6 +800,33 @@ class App {
     const lanes = this.cy.nodes('.lane');
     const floor = readable && this.lastLayout.mode === 'flow' ? READABLE_ZOOM : 0;
     this.fitTo(lanes.nonempty() ? lanes : this.cy.nodes().not('.isolated-out'), animate, 1.25, floor);
+  }
+
+  /**
+   * The view a layout opens with. Small maps fit whole. When a whole fit would be too small to read (large
+   * grouped maps), fit the lanes' width instead, top-aligned under the lane headers, and scroll the suggested
+   * start into view, marked until the first click (F still fits everything).
+   */
+  initialView() {
+    const cy = this.cy;
+    this.fitAll(false, true);
+    const lanes = cy.nodes('.lane');
+    if (this.lastLayout.mode === 'flow' || lanes.empty() || cy.zoom() >= OVERVIEW_BELOW) return;
+    const bb = lanes.boundingBox({ includeLabels: false });
+    const W = cy.width();
+    const H = cy.height();
+    const z = clamp((W - FIT_PAD.x * 2) / bb.w, cy.zoom(), 1.25);
+    const pan = { x: (W - bb.w * z) / 2 - bb.x1 * z, y: FIT_PAD.top - bb.y1 * z };
+    const start = this.hinted ? null : suggestedStart(this);
+    const node = start?.id ? cy.getElementById(start.id) : null;
+    if (node?.nonempty()) {
+      this.hinted = true;
+      const y = node.position('y') * z + pan.y;
+      if (y > H - FIT_PAD.bottom - 60) pan.y = H / 2 - node.position('y') * z;
+      node.addClass('start-hint');
+      cy.one('tap', () => node.removeClass('start-hint'));
+    }
+    cy.viewport({ zoom: z, pan });
   }
 
   zoomBy(factor) {
@@ -843,24 +867,27 @@ class App {
       if (groups.nonempty()) cy.batch(() => groups.forEach((g) => g.style('font-size', Math.min(g.data('fs'), 17 / zz))));
     }, 140);
     const W = cy.width();
-    for (const [lane, el] of Object.entries(this.laneHeads)) {
+    const shown = [];
+    for (const lane of ['be', 'ep', 'fe']) {
+      const el = this.laneHeads[lane];
       const b = this.laneBoxes[lane];
-      if (!b) {
+      const left = b ? Math.max(b.x1 * z + pan.x, 8) : 0;
+      const right = b ? Math.min(b.x2 * z + pan.x, W - 8) : 0;
+      if (!b || right - left < 40) {
         el.hidden = true;
         continue;
       }
-      const sx1 = b.x1 * z + pan.x;
-      const sx2 = b.x2 * z + pan.x;
-      const left = Math.max(sx1, 8);
-      const right = Math.min(sx2, W - 8);
-      if (right - left < 40) {
-        el.hidden = true;
-        continue;
-      }
-      el.hidden = false;
-      el.style.left = `${(left + right) / 2}px`;
-      el.style.maxWidth = `${right - left - 8}px`;
-      el.classList.toggle('compact', right - left < 200);
+      const compact = right - left < Number(el.dataset.full) + 16;
+      shown.push({ el, compact, center: (left + right) / 2, w: Number(el.dataset[compact ? 'compact' : 'full']) });
+    }
+    // Centered on their lanes; when lanes are narrower than their headers, push overlapping headers apart.
+    let prevRight = 0;
+    for (const h of shown) {
+      const x1 = Math.max(h.center - h.w / 2, prevRight + 6);
+      prevRight = x1 + h.w;
+      h.el.hidden = false;
+      h.el.classList.toggle('compact', h.compact);
+      h.el.style.left = `${x1 + h.w / 2}px`;
     }
   }
 
@@ -1019,12 +1046,45 @@ class App {
   openInEditor(id) {
     const url = editorUrl(this.M.byId.get(id), this.meta);
     if (!url) return;
-    const a = document.createElement('a');
-    a.href = url;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    this.toast({ icon: 'external', text: `Opening ${esc(displayName(this.M, id))} in VS Code…`, timeout: 2200 });
+    openLink(url);
+    this.toast({ icon: 'external', text: `Opening ${esc(displayName(this.M, id))}${inWebview ? '' : ' in VS Code'}…`, timeout: 2200 });
+  }
+
+  /** Messages from the editor extension (webview only). */
+  onHostMessage(msg) {
+    if (msg.type === 'stale') {
+      this.toast({
+        id: 'stale',
+        icon: 'alert',
+        text: `<b>${msg.files === 1 ? '1 file' : `${msg.files} files`} changed</b> since this map was made.`,
+        actions: [{ label: 'Refresh', run: () => postToHost({ type: 'refresh' }) }],
+      });
+    } else if (msg.type === 'activeFile') {
+      this.cy.nodes('.active-file').removeClass('active-file');
+      if (msg.id) this.cy.getElementById(msg.id).addClass('active-file');
+    } else if (msg.type === 'reveal') {
+      if (this.M.byId.has(msg.id) && this.cy.getElementById(msg.id).nonempty()) this.select(msg.id, { center: true });
+      else this.toast({ icon: 'alert', text: `${esc(msg.file)} is not on the map (not part of the analyzed projects, or excluded).`, timeout: 3500 });
+    } else if (msg.type === 'test' && testMode) this.onTest(msg);
+  }
+
+  /** The extension's integration tests drive the viewer through these (only when it runs its test suite). */
+  onTest(msg) {
+    const reply = (data) => postToHost({ type: 'testResult', seq: msg.seq, ...data });
+    if (msg.action === 'open') this.openInEditor(msg.id);
+    if (msg.action === 'lens') this.setSecLens(msg.on);
+    if (msg.action === 'tab') this.setTab(msg.tab);
+    reply({
+      cards: this.cy.nodes().not('.lane, .group').length,
+      selected: this.state.selected ?? null,
+      tab: this.state.tab,
+      secLens: Boolean(this.state.secLens),
+      securityTab: !document.querySelector('.tabs [data-tab="security"]').hidden,
+      theme: this.theme.name,
+      activeFile: this.cy.nodes('.active-file').map((n) => n.id()),
+      toasts: [...document.querySelectorAll('.toast')].map((t) => t.textContent.trim()),
+      panel: document.querySelector('#panel-body').textContent.replace(/\s+/g, ' ').slice(0, 2000),
+    });
   }
 
   // --- panel ----------------------------------------------------------------------
@@ -1139,6 +1199,19 @@ class App {
     const done = () => store.set('codemap.onboarded', '1');
     // A big map reads as a wall of cards until something is focused: offer the suggested start right away.
     const start = this.large ? suggestedStart(this) : null;
+    if (start?.classify) {
+      const unknown = this.M.graph.security.summary.unknown;
+      this.toast({
+        id: 'onboarding',
+        icon: 'shield',
+        text: `<b>${this.M.top.length.toLocaleString()} cards.</b> First step: classify <b>${start.classify.middleware.length} middleware</b> to resolve ${start.classify.endpoints.toLocaleString()} of the ${unknown.toLocaleString()} unknown endpoints in the security lens.`,
+        actions: [
+          { label: 'Show them', run: () => (done(), this.setTab('security')) },
+          { label: 'Later', run: done },
+        ],
+      });
+      return;
+    }
     if (start) {
       this.toast({
         id: 'onboarding',
@@ -1424,8 +1497,10 @@ async function main() {
     });
   };
   for (const el of document.querySelectorAll('[data-icon]')) el.outerHTML = icon(el.dataset.icon, 16, el.className);
+  // In VS Code the editor's theme decides; in a browser, the last choice or the system preference.
   const saved = store.get('codemap.theme');
-  const themeName = saved === 'light' || saved === 'dark' ? saved : matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  const themeName = editorTheme() ?? (saved === 'light' || saved === 'dark' ? saved : matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  if (inWebview) $('#btn-theme').hidden = true;
   document.documentElement.dataset.theme = themeName;
   if (store.get('codemap.panel') === 'collapsed') document.body.classList.add('panel-collapsed');
   // Canvas labels need the web fonts before the first draw (Cytoscape caches label bitmaps).
@@ -1433,10 +1508,11 @@ async function main() {
   await Promise.race([Promise.all(fonts), new Promise((r) => setTimeout(r, 2500))]);
   let graph;
   try {
-    const res = await fetch('graph.json', { cache: 'no-store' });
+    const res = await fetch(graphUrl, { cache: 'no-store' });
     graph = await res.json();
   } catch (err) {
     $('#status-left').textContent = 'Could not load graph.json: ' + err.message;
+    postToHost({ type: 'loadError', message: err.message });
     return;
   }
   // A file from another format version would render wrongly or fail halfway: say so instead.
@@ -1445,12 +1521,19 @@ async function main() {
     $('#load-problem-text').textContent = problem.message;
     $('#load-problem').hidden = false;
     $('#status-left').textContent = 'graph.json not shown';
+    postToHost({ type: 'schemaProblem', kind: problem.kind, message: problem.message });
     return;
   }
   const app = new App(graph, themeName);
   window.codemap = app;
+  onHostMessage((msg) => app.onHostMessage(msg));
+  onEditorTheme((name) => app.applyTheme(name, false));
   await app.render();
   app.onboarding();
+  postToHost({ type: 'ready', cards: app.cy.nodes().not('.lane, .group').length });
+  // When the first frame of the map has been drawn (the extension's timing tests compare the two).
+  const readyAt = performance.now();
+  requestAnimationFrame(() => setTimeout(() => postToHost({ type: 'painted', ms: Math.round(performance.now() - readyAt) }), 0));
 }
 
 main();

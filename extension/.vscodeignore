@@ -1,0 +1,12 @@
+# What the .vsix leaves out: sources, tests and build leftovers. out/ holds everything that runs.
+src/**
+test/**
+tsconfig.json
+**/*.map
+**/*.d.ts
+.vscode-test/**
+# web-tree-sitter: only tree-sitter.js and tree-sitter.wasm run (no debug build, C sources or CommonJS copy).
+node_modules/web-tree-sitter/debug/**
+node_modules/web-tree-sitter/lib/**
+node_modules/web-tree-sitter/src/**
+node_modules/web-tree-sitter/tree-sitter.cjs

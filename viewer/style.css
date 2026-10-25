@@ -310,6 +310,10 @@ body.panel-collapsed .panel { visibility: hidden; }
 .start-card .card-title { justify-content: flex-start; gap: 6px; align-items: center; color: var(--accent); }
 .start-card .btn { width: 100%; justify-content: center; margin-top: 8px; }
 .start-card .row-sub { white-space: normal; }
+.start-card .start-text { margin: 2px 0 6px; font-size: 13px; line-height: 1.5; }
+.snippet-head { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+/* Long class names and paths wrap instead of widening the panel. */
+.issue .mono, .issue .note, .lead-card code { overflow-wrap: anywhere; }
 .bar { display: flex; height: 8px; border-radius: 99px; overflow: hidden; background: var(--surface-3); }
 .bar span { display: block; height: 100%; }
 .bar-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; font-size: 11.5px; color: var(--muted); }

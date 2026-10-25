@@ -36,8 +36,8 @@ Or name the two projects: `npx codemap --backend ./api --frontend ./web`. The co
 
 * **Node.js 20 or newer.** Nothing else: no compiler, no Python, no build step.
 * **Try it** with `npx codemap ...`, **install it globally** with `npm install -g codemap` (or `pnpm add -g codemap`), or add it to a project with `npm install -D codemap` and run `npx codemap`.
-* **Platforms.** The package carries prebuilt Tree-sitter parsers for Linux, macOS and Windows, each on x64 and arm64. On Linux they need glibc 2.17 or newer, which is older than what Node 20 itself needs, so they run wherever Node does (Debian 12 and Ubuntu 22.04 included). Alpine Linux (musl) worked in testing (`node:22-alpine`), but it relies on musl loading glibc-built binaries and is not guaranteed. Other platforms (32-bit ARM, FreeBSD...) get a clear error.
-* **Clean installs.** The published package has no native dependencies, no install scripts and no peer-dependency ranges, so npm and pnpm install it without warnings and without running anything. Download size is about 5 MB (38 MB unpacked, mostly the parsers for six platforms).
+* **Platforms.** The package carries prebuilt Tree-sitter parsers for Linux, macOS and Windows, each on x64 and arm64. On Linux they need glibc 2.17 or newer, which is older than what Node 20 itself needs, so they run wherever Node does (Debian 12 and Ubuntu 22.04 included). Alpine Linux (musl) is supported on x64: the core parser ships a musl build, the grammar parsers load there as built, and CI runs `node:22-alpine`. Alpine on arm64 is not supported. Other platforms (32-bit ARM, FreeBSD...) get a clear error.
+* **Clean installs.** The published package has no native dependencies, no install scripts and no peer-dependency ranges, so npm and pnpm install it without warnings and without running anything. Download size is about 5.8 MB (39 MB unpacked, mostly the parsers for six platforms).
 * **Offline and private.** The analysis reads files and writes `graph.json`; the viewer is served from your machine on `localhost`, with Cytoscape, ELK and the fonts bundled. No telemetry, no update checks, no requests to any server.
 
 ### From source
@@ -64,7 +64,18 @@ const { graph } = analyze({ backend: '/path/to/api', frontend: '/path/to/web', s
 console.log(graph.meta.stats, graph.security?.summary);
 ```
 
-`analyze()` takes `backend` and `frontend` roots (either may be `null`), an optional `config` (the shape of `codemap.config.json`; `loadConfig(file, cwd)` reads one, defaults otherwise) and `security`, and returns `{ graph }`: exactly what the CLI writes to `graph.json`, with TypeScript types for every field. `resolveRoots()` and `findProjects()` expose the CLI's project detection, and `checkSchema(graph)` tells whether this version can read a `graph.json` (`SCHEMA_VERSION` is the format version it writes). The package is ESM; Node 20.19+ and 22.12+ can also `require()` it. These exports, the `graph.json` format, the command line and the config file are the public surface (see [Versioning](#versioning)); everything else is internal.
+`analyze()` takes `backend` and `frontend` roots (either may be `null`), an optional `config` (the shape of `codemap.config.json`; `findConfig(starts)` picks the file the CLI would use, `loadConfig(file, cwd)` reads one, defaults otherwise) and `security`, and returns `{ graph }`: exactly what the CLI writes to `graph.json`, with TypeScript types for every field. `resolveRoots()` and `findProjects()` expose the CLI's project detection, and `checkSchema(graph)` tells whether this version can read a `graph.json` (`SCHEMA_VERSION` is the format version it writes). The package is ESM; Node 20.19+ and 22.12+ can also `require()` it. These exports, the `graph.json` format, the command line and the config file are the public surface (see [Versioning](#versioning)); everything else is internal.
+
+### Editor extension (VS Code)
+
+`extension/` is the same analyzer and the same viewer as a VS Code extension: **CodeMap: Open Map** analyzes the workspace in a background process (with progress and cancel) and opens the map in an editor tab; clicking through opens files at the right line beside it; the active editor's file is highlighted on the map; the status bar says when files changed since the analysis. Settings (`codemap.backend`, `codemap.frontend`, `codemap.configFile`, `codemap.security`) act like the CLI's options, and the config file is found by the same rule. It is one universal package for every platform, works over remote development (WSL, SSH, containers), supports Restricted Mode, and makes no network requests. See [`extension/README.md`](extension/README.md).
+
+```bash
+npm ci && npm run build                     # the analyzer, in dist/
+cd extension && npm ci && npm run build     # the extension, in extension/out/
+npm test                                    # integration tests in a downloaded VS Code (CODE_EXECUTABLE=... for a local one)
+npm run package                             # dist-extension/codemap-<version>.vsix; install it with code --install-extension
+```
 
 ## Usage
 
@@ -74,7 +85,7 @@ codemap <monorepoRoot> [options]
 
   -b, --backend <path>   Laravel project root
   -f, --frontend <path>  Next.js project root
-  -c, --config <file>    config file (default: ./codemap.config.json if present)
+  -c, --config <file>    config file (default: the nearest codemap.config.json in or above the projects)
   -o, --out <dir>        output directory for graph.json (default: .codemap)
   -p, --port <n>         viewer port (default: 5178; the next free port is used if busy)
       --no-open          do not open the browser
@@ -118,7 +129,14 @@ The side panel has three tabs (four with `--security`):
 
 ## Configuration (`codemap.config.json`)
 
-The config file is optional. It is read from the current directory, or from `--config <file>`. Comments and trailing commas are allowed, and relative paths resolve against the config file's own directory. Command-line flags override `backend`/`frontend`.
+The config file is optional. Comments and trailing commas are allowed, and relative paths resolve against the config file's own directory. Command-line flags override `backend`/`frontend`.
+
+**Which file is used** does not depend on where you run the command:
+1. `--config <file>`, when given.
+2. Otherwise the nearest `codemap.config.json` to the projects: in the backend root and the frontend root (or the monorepo root you name, or the current folder when you name no project), then in the folders above them, up to the repository root (the folder with `.git`). Outside a git repository the search stops at the folder that holds all the named projects, so a lone project only checks its own folder.
+3. When the backend and the frontend each lead to a different file, the one whose `backend`/`frontend` names the projects being analyzed wins, then the closer one, then the backend's. The others are listed as warnings.
+
+The summary always says which file was used and why (for example `../codemap.config.json (1 folder above the backend root)`), or that none was found and where it looked. `graph.json` records it in `meta.config` (see below), so two runs with different results can be told apart.
 
 ```jsonc
 {
@@ -268,6 +286,7 @@ The output is flat and close to the brief's format, with a few extra fields:
   "meta": {
     "tool": "codemap", "version": "0.1.0",
     "backendRoot": "/abs/api", "frontendRoot": "/abs/web",
+    "config": { "path": "../codemap.config.json", "sha256": "…" }, // or null: the config used, relative to the backend root
     "generatedAt": "…", "durationMs": 1234,
     "timings": { "scan": 0, "parse": 0, "extract": 0, "resolve": 0, "link": 0 },
     "stats": {
@@ -322,7 +341,7 @@ Plain HTML + JavaScript ES modules (`viewer/`, no build step) using Cytoscape.js
 * **Lanes.** Tinted lanes sit behind the three columns. Their headers stay pinned to the top of the canvas while you pan and show counts. The dot grid moves and scales with the canvas.
 * **Cards.** Each card has a coloured left tab with a role icon (controller, model, service, page, component, hook, API client, …), or for endpoints an HTTP-method badge (GET green, POST blue, PUT/PATCH amber, DELETE red), and a short label: class name, route path or file name. The full path is in the tooltip and the panel.
 * **Fonts.** IBM Plex Sans for UI and labels, IBM Plex Mono for paths and routes, Space Grotesk for display text.
-* **Readable on first load.** Small graphs open at no less than 68% zoom (14px card text), centred. Whatever is off-screen is one `F` or minimap drag away.
+* **Readable on first load.** Small graphs open at no less than 68% zoom (14px card text), centred. Large graphs, where fitting everything would leave nothing readable, open fitted to the width of the lanes, top-aligned so the group titles read, with the suggested start scrolled into view and haloed until the first click. Whatever is off-screen is one `F` (fit everything) or minimap drag away. Lane headers never clip their titles; when the lanes are narrow they move apart instead.
 * **Feedback.** Hover tooltips, toasts (isolation, copy, opening VS Code) and a one-time tip on first visit.
 
 **Layout modes.**
@@ -442,7 +461,7 @@ Five single-function checks, chosen for precision over coverage. None follows da
 
 ### Configuration
 
-Classify what CodeMap cannot. Entries match an alias (`tenant`), an alias with parameters (`role:admin`), a group name, or a class FQN, case-insensitively. The CLI summary and the Security tab list the unresolved middleware that decide the most endpoints, so a few lines of config usually settle most unknowns.
+Classify what CodeMap cannot. Entries match an alias (`tenant`), an alias with parameters (`role:admin`), a group name, or a class FQN, case-insensitively. The CLI summary and the Security tab list the unresolved middleware that decide the most endpoints, so a few lines of config usually settle most unknowns. When a few of them (at most five) are all that keeps most unknown endpoints unknown, that comes first: at the top of the security summary and the Security tab, and as the viewer's "Start with" suggestion when it concerns a quarter of the endpoints or more, with a ready-to-edit snippet. For example: "classify 4 middleware to resolve 398 of the 464 unknown endpoints". The count is exact (classifying those names gives exactly that many endpoints a state), and nothing changes until you classify them: CodeMap never decides from a name or a hint.
 
 ```jsonc
 "security": {
@@ -461,6 +480,7 @@ Classify what CodeMap cannot. Entries match an alias (`tenant`), an alias with p
 `graph.json` gains `security`, and definition nodes gain `endLine`:
 * `summary`: counts per state.
 * `unknownReasons`: why endpoints stayed unknown, with counts.
+* `classifyFirst`: `{ middleware, endpoints }` when a few unresolved middleware (from `middleware.unresolved`) are all that keeps a majority of the unknown endpoints unknown, else `null`.
 * `endpoints[]`: `state`, `confidence`, `reason`, `middleware`, `signals[]` (`effect`, `source`, `text`, `detail`, `confidence`, `file`, `line`), `unknown[]`, `notes[]`, `stateChanging`, `frontendCallers`, `reach`, `findings`, `review[]`.
 * `middleware`: aliases, groups, global middleware, and unresolved middleware with `endpoints`, `decisive` and `hint`.
 * `actions[]` and `actionSummary`: server actions, shaped like `endpoints[]` with `kind: "action"`, and their counts per state.
@@ -475,7 +495,7 @@ Output is sorted and deterministic.
 In the viewer:
 * The **Lens** button (`S`) outlines endpoint and server action cards by state and gives cards that contain a finding a dashed outline. These are class toggles only, so it is cheap on large graphs.
 * The **Security** tab has:
-  * the distribution, a review list (or one state at a time), why things are unknown, and a ready-to-edit config snippet
+  * the first step when a few middleware keep most unknowns unknown, the distribution, a review list (or one state at a time), why things are unknown, and a ready-to-edit config snippet
   * server actions (their distribution and the ones to review) and the `middleware.ts` matcher and gates
   * the findings, reached-from-an-endpoint and weakest protection first, filterable by imported vs CodeMap checks, plus those not on the map, the SARIF import summary and the check list
   * caveats and the full "not checked" list
@@ -557,9 +577,21 @@ Releases follow semantic versioning over a defined public surface: the command l
 
 ## Technical choices
 
-* **Tree-sitter (native Node bindings) for both languages.** It's fast, tolerant of broken code (files with syntax errors are still analyzed and flagged `parseError`), and offers one API with declarative queries for PHP and TS/JS. Regex is too fragile, language servers are slow and heavy, and type-aware compilers are out of scope.
+* **Tree-sitter for both languages.** It's fast, tolerant of broken code (files with syntax errors are still analyzed and flagged `parseError`), and offers one API with declarative queries for PHP and TS/JS. Regex is too fragile, language servers are slow and heavy, and type-aware compilers are out of scope.
+* **Native parsers for the CLI, WebAssembly for the editor extension.** The analyzer takes either runtime (`setParserRuntime` in `src/parse.ts`): the native Node-API bindings (the CLI's default) or `web-tree-sitter` with the grammars' own `.wasm` builds, the same grammar versions. Measured before building the extension, on the fixtures and on news-laravel + HomesPH (5,567 files, `--security`), on this machine:
+
+  | | Native | WebAssembly |
+  | --- | --- | --- |
+  | Loads inside VS Code (Electron 42) | yes | yes |
+  | `graph.json` | identical | identical (18.8 MB, byte for byte after normalization) |
+  | Analysis, plain Node | 17.8–18.8 s | 13.0–13.5 s |
+  | Analysis, VS Code's process | 17.3–18.0 s | 13.3–14.3 s |
+  | Memory | 1.73–1.88 GB RSS | 1.25–1.37 GB RSS, of which 0.82 GB parser heap (2 GiB ceiling) |
+  | Package | parsers for 6 platforms (39 MB unpacked) | 4 grammars, any platform (4.1 MB) |
+
+  WebAssembly parses about 20% slower, but walking the trees is about twice as fast, because every node access through the native binding crosses into C++. The extension uses WebAssembly: one small package for every platform (including remote machines), faster, and identical output. Its one cost is the 2 GiB parser memory ceiling (roughly 14,000 files of this size); hitting it stops the analysis with a message instead of yielding a partial map. The CLI keeps the native parsers, which have no ceiling. The whole test suite also runs on the WebAssembly runtime (`CODEMAP_PARSER=wasm npm test`, in CI), so the two cannot drift apart.
 * **Queries over JS tree walks.** The first version walked syntax trees in JavaScript. Profiling showed most of the time went into the bindings materializing a JS object for every node. Switching to `.scm` queries, so the native engine returns only calls, JSX usages and declarations, cut extraction from 13.8 s to 5.8 s on a 4,544-file app. A single combined query per PHP file traverses each tree once.
-* **TypeScript on Node, no framework.** One language for analyzer and viewer. The code could later become a VS Code extension.
+* **TypeScript on Node, no framework.** One language for analyzer and viewer. The viewer talks to its host through one module (`viewer/host.js`), so the same files run behind the CLI's local server and in the extension's webview.
 * **Matching by normalized URL patterns.** This is the only practical static link between the two stacks. Each matching rule decides *certain vs uncertain*, and nothing is guessed silently: anything dropped is counted in the stats and sampled in `diagnostics`.
 * **No database, caching or worker threads.** Measurements didn't call for them; see below.
 
@@ -596,8 +628,10 @@ Pan and zoom stay smooth because Cytoscape hides edges and uses a texture during
 ## Tests
 
 ```bash
-npm test          # vitest: 119 tests
+npm test                       # vitest: 135 tests
+CODEMAP_PARSER=wasm npm test   # the same tests on the WebAssembly runtime the editor extension uses
 npm run typecheck
+cd extension && npm test       # the extension's integration tests in a real VS Code (after npm run build in both)
 ```
 
 * `test/php-extract.test.ts`: definitions; `use`, alias and group-`use` resolution; every PHP call rule (typed and promoted properties, typed parameters, reassignment, `self`/`static`/`parent`, `new`, chains, route closures).
@@ -612,6 +646,11 @@ npm run typecheck
 * `test/portability.test.ts`: a copy of the security fixtures as a Windows checkout would have them (`\r\n` line ends, byte-order marks on JSON and sources) gives the same `graph.json`.
 * `test/route.test.ts`: viewer edge routing (brackets within a column, nesting, channels between columns, shared arrowheads, straight edges, widening, and the Cytoscape weights/distances giving back the same points).
 * `test/base-path.test.ts`: backend base paths from config, from `process.env.X || "http://host/api"` fallbacks, and inferred project-wide.
+* `test/runtime.test.ts`, `test/runtime-abort.test.ts`: which parser runtime ran, and a runtime that runs out of memory stops the analysis instead of skipping the rest of the project.
+* `test/extension-manifest.test.ts`: `extension/package.json` is generated from `package.json`, so every extension identifier derives from the CLI's command name.
+* `extension/test/suite.cjs` (in VS Code): opening the map, opening a file at the right line beside it, the active-file highlight and **Show Current File on Map**, the security lens setting, out of date and refresh, following the editor theme, the format-version check, Restricted Mode ignoring the config's `security` section, and no network use (each analysis runs with networking disabled). `CODEMAP_PERF_WORKSPACE=<folder>` times a large project instead.
+* `test/config-lookup.test.ts`: which config file belongs to the projects (repository root, not above it, closest, the one naming the projects, backend on a tie, the folder holding both outside a repository), and `meta.config` (relative path, a hash that ignores comments, key order, line endings and byte-order marks).
+* `test/classify-first.test.ts`: the first step names the few middleware that keep most unknowns unknown, classifying them resolves exactly the endpoints it counts, it never changes a state itself, and it stays empty when no small set settles a majority.
 * `test/versioning.test.ts`: the version in `package.json` is the one the API, the CLI and `graph.json` report; `graph.json` starts with `schemaVersion`; `checkSchema()` accepts the current format and explains newer, older, missing and invalid ones; the changelog check that guards `npm version` and `npm publish`.
 * `test/findings.test.ts`: SARIF reading (rules, levels, severities, message strings, artifacts, suppressions, unreadable files), path matching (exact, suffix, absolute, `file://`, ambiguous, outside), placement on the innermost definition, endpoint/caller/page context, stable ids, and every local check hit and non-hit on the fixtures.
 
@@ -643,6 +682,7 @@ src/
   analyze.ts        pipeline orchestration + timings + stats (no UI)
   index.ts          programmatic API (the package entry)
   schema.ts         graph.json format version and checkSchema(), shared with the viewer (served as /schema.js)
+  wasm-runtime.ts   the WebAssembly parser runtime (web-tree-sitter) for setParserRuntime(), used by the extension
   detect.ts         Laravel/Next.js detection, composer.json, tsconfig paths
   scan.ts           fast-glob + ignore (.gitignore aware)
   parse.ts          Tree-sitter parsers and query loader
@@ -660,11 +700,15 @@ src/
 viewer/             no build step: index.html, style.css (design tokens, both themes) and ES modules:
                     app.js (state, layouts, focus, events), graphstyle.js (Cytoscape styles), theme.js (palettes,
                     groups, bands), icons.js (icons + card tabs), model.js (indexes, labels, search),
-                    panel.js (side panel + tooltip), minimap.js
+                    panel.js (side panel + tooltip), minimap.js, host.js (browser tab or VS Code webview)
 fixtures/           laravel-api/, next-web/, laravel-security/, next-security/, sarif/
 test/               vitest suites
+extension/          the VS Code extension: src/extension.cts (commands, worker, webview, watching), src/webview.cts
+                    (the viewer page with a strict CSP), src/worker.mjs (the analysis process), test/ (integration
+                    tests in VS Code), README.md, THIRD_PARTY_NOTICES.md (generated); built into extension/out/
 scripts/            copy-assets.mjs (.scm queries into dist/), vendor-native.mjs (parsers into dist/native),
-                    check-release.mjs (changelog check for npm version/publish), rename.mjs, build-linux-binding.sh
+                    check-release.mjs (changelog check for npm version/publish), rename.mjs, build-linux-binding.sh,
+                    extension-manifest.mjs (extension/package.json from package.json), build-extension.mjs
 native-prebuilds/   rebuilt parser binaries that replace broken upstream ones (see its README)
 docs/               PUBLISHING.md (owner's release checklist and versioning policy), screenshots
 CHANGELOG.md        changes per release, including "Results may differ"
@@ -673,7 +717,7 @@ CHANGELOG.md        changes per release, including "Results may differ"
 ## Decisions where the brief was open
 
 * **Graph shape.**
-  * Output goes to `.codemap/graph.json` in the current directory. The default port is 5178, moving to the next free port if busy.
+  * Output goes to `.codemap/graph.json` in the current directory (the config file, though, is looked up next to the projects). The default port is 5178, moving to the next free port if busy.
   * Methods nest under their class, and classes under their file. The brief's example put methods directly under the file.
   * Extra edge kind `renders` for JSX usage, so component trees can be toggled separately from calls.
   * Repeated identical edges are merged with a `count`.

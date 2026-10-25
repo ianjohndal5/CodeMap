@@ -26,6 +26,13 @@ function timed(timings: Timings, stage: Stage, fn: () => void): void {
   timings[stage] += performance.now() - t0;
 }
 
+/** meta.config: the config file relative to the first analyzed root, so that it reads the same on every machine. */
+function configRecord(config: AnalyzeOptions['config'], root: string | null): Graph['meta']['config'] {
+  if (!config.source) return null;
+  const rel = root ? path.relative(root, config.source.file) : config.source.file;
+  return { path: toPosix(rel), sha256: config.source.sha256 };
+}
+
 /** Run the whole pipeline (scan -> parse -> extract -> resolve -> link) without any UI. */
 export function analyze(opts: AnalyzeOptions): AnalyzeResult {
   const started = performance.now();
@@ -47,14 +54,15 @@ export function analyze(opts: AnalyzeOptions): AnalyzeResult {
   if (opts.backend) adapters.push(new LaravelAdapter(opts.backend, config, warnings, { keepSyntax }));
   if (opts.frontend) adapters.push(new NextAdapter(opts.frontend, config, warnings, { keepSyntax }));
 
-  for (const a of adapters) timed(timings, 'scan', () => a.scan());
-  for (const a of adapters) timed(timings, 'parse', () => a.parse());
-  for (const a of adapters) timed(timings, 'extract', () => a.extract());
-  for (const a of adapters) timed(timings, 'resolve', () => a.resolve(graph));
+  for (const stage of ['scan', 'parse', 'extract', 'resolve'] as const) {
+    opts.onStage?.(stage);
+    for (const a of adapters) timed(timings, stage, () => (stage === 'resolve' ? a.resolve(graph) : a[stage]()));
+  }
 
   const endpoints = adapters.flatMap((a) => a.endpoints);
   const httpCalls = adapters.flatMap((a) => a.httpCalls);
   let linked = { matchedCalls: 0, unmatchedCalls: [] as Graph['unmatched']['httpCalls'], unmatchedEndpoints: [] as string[] };
+  opts.onStage?.('link');
   timed(timings, 'link', () => {
     linked = link(graph, httpCalls, endpoints, {
       backendEnvVars: config.next.backendEnvVars,
@@ -97,6 +105,7 @@ export function analyze(opts: AnalyzeOptions): AnalyzeResult {
       version: VERSION,
       backendRoot: opts.backend ? toPosix(opts.backend) : null,
       frontendRoot: opts.frontend ? toPosix(opts.frontend) : null,
+      config: configRecord(config, opts.backend ?? opts.frontend),
       generatedAt: new Date().toISOString(),
       durationMs: Math.round(performance.now() - started),
       timings,
@@ -109,6 +118,7 @@ export function analyze(opts: AnalyzeOptions): AnalyzeResult {
     diagnostics: graph.diagnostics,
   };
   if (opts.security) {
+    opts.onStage?.('security');
     const t0 = performance.now();
     result.security = analyzeSecurity(result, adapters, config.security);
     timings.security = Math.round(performance.now() - t0);

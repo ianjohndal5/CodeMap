@@ -3,31 +3,52 @@ import path from 'node:path';
 import type TreeSitter from 'tree-sitter';
 import { loadNative } from './native.js';
 
-const Parser = loadNative<typeof TreeSitter>('tree-sitter');
-const PHP = loadNative<{ php: unknown }>('tree-sitter-php');
-const TypeScript = loadNative<{ typescript: unknown; tsx: unknown }>('tree-sitter-typescript');
-const JavaScript = loadNative<unknown>('tree-sitter-javascript');
-
 export type LangId = 'php' | 'ts' | 'tsx' | 'js';
 export type Tree = TreeSitter.Tree;
 export type SyntaxNode = TreeSitter.SyntaxNode;
 
-// `php` (not `php_only`) is the grammar for whole files: it accepts the leading
-// `<?php` tag and any inline HTML around it.
-const LANGUAGES: Record<LangId, unknown> = {
-  php: PHP.php,
-  ts: TypeScript.typescript,
-  tsx: TypeScript.tsx,
-  js: JavaScript,
-};
+/**
+ * The Tree-sitter runtime: the native binding (the default, used by the CLI) or WebAssembly (`web-tree-sitter`,
+ * installed by the editor extension). Both run the same grammar versions and produce the same graph.json.
+ */
+export interface ParserRuntime {
+  Parser: new () => { setLanguage(language: unknown): void; parse(source: string): Tree | null };
+  Query: new (language: unknown, source: string) => TreeSitter.Query;
+  /** `php` (not `php_only`) for whole files: it accepts the leading `<?php` tag and inline HTML around it. */
+  languages: Record<LangId, unknown>;
+}
 
-const parsers = new Map<LangId, TreeSitter>();
+let runtime: ParserRuntime | null = null;
 
-function parserFor(lang: LangId): TreeSitter {
+/** Use another runtime than the native binding (the extension's WebAssembly one). Call it before anything is parsed. */
+export function setParserRuntime(r: ParserRuntime): void {
+  if (parsers.size || queries.size) throw new Error('setParserRuntime() must be called before the first parse');
+  runtime = r;
+}
+
+/** The runtime in use; the native binding is loaded on first use, so a WebAssembly-only package never needs it. */
+function current(): ParserRuntime {
+  if (runtime) return runtime;
+  const Parser = loadNative<typeof TreeSitter>('tree-sitter');
+  const PHP = loadNative<{ php: unknown }>('tree-sitter-php');
+  const TypeScript = loadNative<{ typescript: unknown; tsx: unknown }>('tree-sitter-typescript');
+  const JavaScript = loadNative<unknown>('tree-sitter-javascript');
+  runtime = {
+    Parser: Parser as unknown as ParserRuntime['Parser'],
+    Query: Parser.Query as unknown as ParserRuntime['Query'],
+    languages: { php: PHP.php, ts: TypeScript.typescript, tsx: TypeScript.tsx, js: JavaScript },
+  };
+  return runtime;
+}
+
+const parsers = new Map<LangId, InstanceType<ParserRuntime['Parser']>>();
+
+function parserFor(lang: LangId): InstanceType<ParserRuntime['Parser']> {
   let p = parsers.get(lang);
   if (!p) {
-    p = new Parser();
-    p.setLanguage(LANGUAGES[lang] as TreeSitter.Language);
+    const rt = current();
+    p = new rt.Parser();
+    p.setLanguage(rt.languages[lang]);
     parsers.set(lang, p);
   }
   return p;
@@ -54,7 +75,9 @@ export function langForFile(file: string): LangId | null {
 }
 
 export function parseSource(lang: LangId, source: string): Tree {
-  return parserFor(lang).parse(source);
+  const tree = parserFor(lang).parse(source);
+  if (!tree) throw new Error('the parser returned no tree');
+  return tree;
 }
 
 const queries = new Map<string, TreeSitter.Query>();
@@ -68,7 +91,8 @@ export function loadQuery(lang: LangId, base: string | URL, ...files: string[]):
   let q = queries.get(key);
   if (!q) {
     const source = files.map((f) => fs.readFileSync(new URL(f, base), 'utf8')).join('\n');
-    q = new Parser.Query(LANGUAGES[lang] as TreeSitter.Language, source);
+    const rt = current();
+    q = new rt.Query(rt.languages[lang], source);
     queries.set(key, q);
   }
   return q;
@@ -123,6 +147,12 @@ export function parseFile(root: string, rel: string): ParseOutcome {
     const tree = parseSource(lang, source);
     return { ok: true, file: { rel, abs, lang, source, tree, hasError: tree.rootNode.hasError } };
   } catch (e) {
+    // The WebAssembly runtime aborts when its fixed memory (2 GiB) runs out, and every later parse fails too:
+    // stop instead of returning a map with the rest of the project missing.
+    const RuntimeError = (globalThis as { WebAssembly?: { RuntimeError: abstract new () => Error } }).WebAssembly?.RuntimeError;
+    if (RuntimeError && e instanceof RuntimeError) {
+      throw new Error(`The parser ran out of memory at ${rel}, so the analysis stopped. This project is too large for the WebAssembly parser; the command-line tool has no such limit.`);
+    }
     return { ok: false, rel, reason: `parse failed: ${(e as Error).message}` };
   }
 }

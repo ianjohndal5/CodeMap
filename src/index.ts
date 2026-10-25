@@ -16,6 +16,8 @@ export interface ProjectOptions {
   warnings?: string[];
   /** Add the security lens (`graph.security`), like --security. */
   security?: boolean;
+  /** Called as each stage starts: scan, parse, extract, resolve, link, then security. */
+  onStage?: (stage: 'scan' | 'parse' | 'extract' | 'resolve' | 'link' | 'security') => void;
 }
 
 /** Analyze a Laravel backend and/or a Next.js frontend. Deterministic, offline, and never runs either project. */
@@ -26,8 +28,8 @@ export function analyze(opts: ProjectOptions): { graph: Graph } {
 export { VERSION } from './brand.js';
 export { SCHEMA_VERSION, checkSchema } from './schema.js';
 export type { SchemaProblem } from './schema.js';
-export { defaultConfig, loadConfig } from './config.js';
-export type { CodemapConfig, LaravelOptions, NextOptions, SecurityOptions } from './config.js';
+export { defaultConfig, findConfig, loadConfig } from './config.js';
+export type { CodemapConfig, ConfigLookup, ConfigStart, LaravelOptions, NextOptions, SecurityOptions } from './config.js';
 export { findProjects, resolveRoots } from './detect.js';
 export type { Diagnostic, EdgeKind, Graph, GraphEdge, GraphNode, NodeKind, Side, Stats, Timings, UnmatchedHttpCall } from './types.js';
 export type * from './security/types.js';

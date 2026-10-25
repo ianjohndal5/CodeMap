@@ -1,0 +1,123 @@
+{
+  "name": "codemap",
+  "displayName": "CodeMap",
+  "description": "Offline map of a Laravel backend and a Next.js frontend: which component calls which endpoint, and which code handles it. With an opt-in security lens.. Maps Laravel and Next.js code, the endpoints between them and an optional security lens, inside the editor; fully offline.",
+  "version": "0.1.0",
+  "publisher": "codemap-placeholder",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "keywords": [
+    "laravel",
+    "nextjs",
+    "next.js",
+    "visualizer",
+    "architecture",
+    "call-graph",
+    "static-analysis",
+    "tree-sitter",
+    "security-review"
+  ],
+  "main": "./out/extension.cjs",
+  "extensionKind": [
+    "workspace"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "In Restricted Mode, CodeMap still maps the code (it only reads files and never runs them) but ignores the \"security\" section of the workspace's codemap.config.json: an untrusted config could classify middleware so that unprotected routes look protected.",
+      "restrictedConfigurations": [
+        "codemap.configFile"
+      ]
+    }
+  },
+  "activationEvents": [
+    "onWebviewPanel:codemap.map"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "codemap.open",
+        "title": "Open Map",
+        "category": "CodeMap",
+        "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "codemap.refresh",
+        "title": "Refresh Map",
+        "category": "CodeMap",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "codemap.revealFile",
+        "title": "Show Current File on Map",
+        "category": "CodeMap"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "codemap.revealFile",
+          "when": "editorIsOpen"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "codemap.revealFile",
+          "when": "activeWebviewPanelId != 'codemap.map' && resourceScheme == file && codemap.mapOpen",
+          "group": "navigation@99"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "CodeMap",
+      "properties": {
+        "codemap.backend": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "markdownDescription": "Laravel project root, relative to the workspace folder (like `--backend`). Empty: from `codemap.config.json`, else detected."
+        },
+        "codemap.frontend": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "markdownDescription": "Next.js project root, relative to the workspace folder (like `--frontend`). Empty: from `codemap.config.json`, else detected."
+        },
+        "codemap.configFile": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "markdownDescription": "Config file to use, relative to the workspace folder (like `--config`). Empty: the nearest `codemap.config.json` in or above the projects, as the command line looks for it."
+        },
+        "codemap.security": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "markdownDescription": "Add the security lens (like `--security`): route protection signals for review. A review aid, not a scanner."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "node ../scripts/build-extension.mjs",
+    "build": "node ../scripts/build-extension.mjs",
+    "test": "node test/run.mjs",
+    "package": "node -e \"require('fs').mkdirSync('../dist-extension', { recursive: true })\" && vsce package --skip-license --allow-missing-repository --out ../dist-extension/"
+  },
+  "dependencies": {
+    "fast-glob": "3.3.3",
+    "ignore": "7.0.5",
+    "web-tree-sitter": "0.25.10"
+  },
+  "devDependencies": {
+    "@types/vscode": "1.90.0",
+    "@vscode/test-electron": "3.1.0",
+    "@vscode/vsce": "4.0.0"
+  }
+}

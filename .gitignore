@@ -5,3 +5,8 @@ node_modules/
 /legacy/
 /homes/
 /rentalsph/
+/dist-extension/
+/extension/out/
+/extension/node_modules/
+/extension/CHANGELOG.md
+/extension/.vscode-test/

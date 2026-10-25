@@ -170,6 +170,10 @@ export function stylesheet(t, { large }) {
       },
     },
     { selector: 'node.search-hit', style: { 'underlay-color': t.accent, 'underlay-opacity': 0.32, 'underlay-padding': 5, 'underlay-shape': 'round-rectangle' } },
+    // The file open in the editor (VS Code extension).
+    { selector: 'node.active-file', style: { 'underlay-color': t.lanes.fe, 'underlay-opacity': 0.3, 'underlay-padding': 9, 'underlay-shape': 'round-rectangle' } },
+    // The suggested start on a large map's first view: a halo big enough to find at overview zoom.
+    { selector: 'node.start-hint', style: { 'underlay-color': t.accent, 'underlay-opacity': 0.5, 'underlay-padding': 160, 'underlay-shape': 'round-rectangle' } },
     { selector: '.isolated-out', style: { display: 'none' } },
   ];
 }

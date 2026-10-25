@@ -19,8 +19,11 @@ export interface LaravelFindings {
   notes: string[];
   middleware: string[];
   loader: RawRoute['loader'];
-  /** Unknown middleware names on this endpoint (for the unresolved table). */
-  unresolved: { name: string; reason: string; hint?: string }[];
+  /**
+   * Unknown middleware names on this endpoint (for the unresolved table). `settles`: classifying the name in the
+   * config removes its unknown entry (not so for controller middleware whose only/except could not be read).
+   */
+  unresolved: { name: string; reason: string; hint?: string; settles: boolean }[];
 }
 
 /** One written middleware entry plus where it came from. */
@@ -171,7 +174,7 @@ export class LaravelSecurity {
     if (leaf.effect === 'unknown') {
       const reason = e.maybe ? 'conditional-controller-middleware' : leaf.unknown?.reason ?? 'custom-middleware';
       f.unknown.push({ reason, text: `${global ? 'global ' : ''}${e.text}: ${leaf.detail}` });
-      if (leaf.unknown) f.unresolved.push({ name: leaf.unknown.name, reason: leaf.unknown.reason, hint: leaf.unknown.hint });
+      if (leaf.unknown) f.unresolved.push({ name: leaf.unknown.name, reason: leaf.unknown.reason, hint: leaf.unknown.hint, settles: !e.maybe });
       return;
     }
     if (e.maybe) {
