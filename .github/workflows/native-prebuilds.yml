@@ -46,7 +46,8 @@ jobs:
           out="$GITHUB_WORKSPACE/out/tree-sitter" && mkdir -p "$out/${{ matrix.platform }}"
           node -p "require('./node_modules/tree-sitter/package.json').version" > "$out/VERSION"
           cd "$b/pkg"
-          npx --yes node-gyp@11 rebuild --napi_build_version=8
+          # node-gyp 12.1 or newer: older ones do not recognize Visual Studio 2026 on current Windows images.
+          npx --yes node-gyp@12 rebuild --napi_build_version=8
           file="$out/${{ matrix.platform }}/tree-sitter.node"
           cp build/Release/tree_sitter_runtime_binding.node "$file"
           if [ "$RUNNER_OS" = macOS ]; then strip -x "$file" && codesign --force --sign - "$file"; fi

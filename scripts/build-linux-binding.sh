@@ -28,7 +28,7 @@ build() { # <package> <platform> <output file> <docker setup> <env> <node-gyp ar
       cp -r /src/pkg /tmp/b/pkg
       cp -r /src/node-addon-api /tmp/b/node_modules/node-addon-api
       cd /tmp/b/pkg
-      env $5 LDFLAGS='-static-libstdc++ -static-libgcc' npx --yes node-gyp@11 rebuild --arch=$6 --nodedir=/usr/local --napi_build_version=8 > /tmp/build.log 2>&1 || { tail -40 /tmp/build.log; exit 1; }
+      env $5 LDFLAGS='-static-libstdc++ -static-libgcc' npx --yes node-gyp@12 rebuild --arch=$6 --nodedir=/usr/local --napi_build_version=8 > /tmp/build.log 2>&1 || { tail -40 /tmp/build.log; exit 1; }
       $7 --strip-unneeded build/Release/*_binding.node
       cp build/Release/*_binding.node /out/$3
       chown $(id -u):$(id -g) /out/$3
