@@ -1,4 +1,8 @@
 e6cdd660d86d41b3771ce9a6adb03ef86ce4f15705a4441b633225ee51a2eb25  tree-sitter-typescript/linux-arm64/tree-sitter-typescript.node
+a42799bd31506192d9605a86dd25139aa359ab7a575d47dc6750537fb1f70bd4  tree-sitter/darwin-arm64/tree-sitter.node
+7a1fa7f53217ed5dd28f634ef46649ccbc27ba3658c64f75af3b5f05430c96a9  tree-sitter/darwin-x64/tree-sitter.node
 0a368a90301a12cc133b9acdb0fd1c3c5d2c8e64359b2d195b41fdc393720332  tree-sitter/linux-arm64/tree-sitter.node
 a6ea8b514ec2d08bb9ea4b801ca57a1865d3392552a748ca6a2cc837d14ee8d9  tree-sitter/linux-x64/tree-sitter.musl.node
 95ab611d522cb834d77a4bb872ee445eea412e8c45d7a97e4808a91ac78e5e7e  tree-sitter/linux-x64/tree-sitter.node
+fe83d12894213dc07604ef00693d40c9333ea7ad0d0053cf40c4017b618b52f4  tree-sitter/win32-arm64/tree-sitter.node
+acacadb0ac77a1f861ef7aec5d68bd9a0668ea56542c759ed1ef71baa891f769  tree-sitter/win32-x64/tree-sitter.node
