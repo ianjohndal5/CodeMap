@@ -9,7 +9,7 @@ import { runTests } from '@vscode/test-electron';
 
 const ext = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fixtures = path.resolve(ext, '..', 'fixtures');
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'codemap-ext-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'seammap-ext-test-'));
 const workspace = path.join(tmp, 'workspace');
 fs.cpSync(path.join(fixtures, 'laravel-api'), path.join(workspace, 'api'), { recursive: true });
 fs.cpSync(path.join(fixtures, 'next-web'), path.join(workspace, 'web'), { recursive: true });

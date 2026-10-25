@@ -148,7 +148,7 @@ export function stylesheet(t, { large }) {
     // Before the interaction states so selection and focus still win.
     ...Object.entries(t.security).map(([state, c]) => ({ selector: `node.sec-${state}`, style: { 'border-color': c, 'border-width': 2.5, 'border-opacity': 1, 'border-style': 'solid' } })),
     { selector: 'node.sec-none, node.sec-unknown', style: { 'border-width': 3 } },
-    // A finding inside this card (SARIF or a CodeMap check): an outline, no image.
+    // A finding inside this card (SARIF or a SeamMap check): an outline, no image.
     { selector: 'node.has-finding', style: { 'outline-width': 2.5, 'outline-color': t.security.none, 'outline-opacity': 0.85, 'outline-offset': 3, 'outline-style': 'dashed' } },
     // Interaction states
     { selector: 'node.hover', style: { 'border-color': t.cardHover, 'border-width': 1.5 } },

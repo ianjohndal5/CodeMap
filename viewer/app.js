@@ -1,5 +1,5 @@
 /* global cytoscape, cytoscapeElk, ELK */
-// CodeMap viewer: reads graph.json (written by the analyzer) and renders it with
+// SeamMap viewer: reads graph.json (written by the analyzer) and renders it with
 // Cytoscape.js + the ELK layered layout. No build step, no framework.
 
 import { cardTab, icon, methodTab } from './icons.js';
@@ -120,7 +120,7 @@ class App {
       }
       for (let id = f.node; id; id = this.M.byId.get(id)?.parent) this.findingSubtree.set(id, (this.findingSubtree.get(id) ?? 0) + 1);
     }
-    this.state.secLens = Boolean(this.sec) && store.get('codemap.secLens') !== 'off';
+    this.state.secLens = Boolean(this.sec) && store.get('seammap.secLens') !== 'off';
     this.large = this.M.top.length > FLOW_LIMIT.nodes;
     this.cy = cytoscape({
       container: $('#cy'),
@@ -134,7 +134,7 @@ class App {
     });
     this.minimap = new Minimap(this.cy, $('#minimap'), this.theme);
     // The minimap earns its space on large graphs; small ones fit on screen anyway.
-    const mapPref = store.get('codemap.minimap');
+    const mapPref = store.get('seammap.minimap');
     this.setMinimap(mapPref ? mapPref === 'on' : this.large, false);
     this.laneBoxes = {};
     this.edgeData = new Map();
@@ -190,7 +190,7 @@ class App {
   setSecLens(on) {
     if (!this.sec) return;
     this.state.secLens = on;
-    store.set('codemap.secLens', on ? 'on' : 'off');
+    store.set('seammap.secLens', on ? 'on' : 'off');
     this.cy.batch(() => {
       this.cy.nodes().forEach((n) => {
         for (const c of SEC_CLASSES) n.removeClass(c);
@@ -248,7 +248,7 @@ class App {
   applyTheme(name, remember = true) {
     this.theme = THEMES[name];
     document.documentElement.dataset.theme = name;
-    if (remember) store.set('codemap.theme', name);
+    if (remember) store.set('seammap.theme', name);
     this.cy.style(stylesheet(this.theme, { large: this.large }));
     this.cy.batch(() => {
       this.cy.nodes().forEach((n) => {
@@ -1195,8 +1195,8 @@ class App {
   }
 
   onboarding() {
-    if (store.get('codemap.onboarded')) return;
-    const done = () => store.set('codemap.onboarded', '1');
+    if (store.get('seammap.onboarded')) return;
+    const done = () => store.set('seammap.onboarded', '1');
     // A big map reads as a wall of cards until something is focused: offer the suggested start right away.
     const start = this.large ? suggestedStart(this) : null;
     if (start?.classify) {
@@ -1234,7 +1234,7 @@ class App {
 
   /** The suggested start: focus its chain, and on big maps isolate it so it gets a layout of its own. */
   async startWith(id) {
-    store.set('codemap.onboarded', '1');
+    store.set('seammap.onboarded', '1');
     this.dismissToast('onboarding');
     this.select(id, { center: true });
     if (this.large && !this.state.isolated) await this.isolate(true);
@@ -1243,13 +1243,13 @@ class App {
   setMinimap(on, remember = true) {
     $('#minimap').hidden = !on;
     $('#map-toggle').setAttribute('aria-pressed', String(on));
-    if (remember) store.set('codemap.minimap', on ? 'on' : 'off');
+    if (remember) store.set('seammap.minimap', on ? 'on' : 'off');
     if (on) this.minimap.refresh();
   }
 
   togglePanel() {
     document.body.classList.toggle('panel-collapsed');
-    store.set('codemap.panel', document.body.classList.contains('panel-collapsed') ? 'collapsed' : 'open');
+    store.set('seammap.panel', document.body.classList.contains('panel-collapsed') ? 'collapsed' : 'open');
     setTimeout(() => {
       this.cy.resize();
       this.minimap.refresh();
@@ -1492,17 +1492,17 @@ async function main() {
   const origLayout = ELK.prototype.layout;
   ELK.prototype.layout = function (...args) {
     return origLayout.apply(this, args).catch((err) => {
-      window.codemap?.pendingLayoutReject?.(err);
+      window.seammap?.pendingLayoutReject?.(err);
       return new Promise(() => {}); // swallow: cytoscape-elk has no rejection handler
     });
   };
   for (const el of document.querySelectorAll('[data-icon]')) el.outerHTML = icon(el.dataset.icon, 16, el.className);
   // In VS Code the editor's theme decides; in a browser, the last choice or the system preference.
-  const saved = store.get('codemap.theme');
+  const saved = store.get('seammap.theme');
   const themeName = editorTheme() ?? (saved === 'light' || saved === 'dark' ? saved : matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
   if (inWebview) $('#btn-theme').hidden = true;
   document.documentElement.dataset.theme = themeName;
-  if (store.get('codemap.panel') === 'collapsed') document.body.classList.add('panel-collapsed');
+  if (store.get('seammap.panel') === 'collapsed') document.body.classList.add('panel-collapsed');
   // Canvas labels need the web fonts before the first draw (Cytoscape caches label bitmaps).
   const fonts = ['500 13px "IBM Plex Sans"', '400 12px "IBM Plex Sans"', '500 12px "IBM Plex Mono"', '700 16px "Space Grotesk"'].map((f) => document.fonts.load(f));
   await Promise.race([Promise.all(fonts), new Promise((r) => setTimeout(r, 2500))]);
@@ -1525,7 +1525,7 @@ async function main() {
     return;
   }
   const app = new App(graph, themeName);
-  window.codemap = app;
+  window.seammap = app;
   onHostMessage((msg) => app.onHostMessage(msg));
   onEditorTheme((name) => app.applyTheme(name, false));
   await app.render();

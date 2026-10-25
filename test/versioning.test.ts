@@ -38,8 +38,8 @@ describe('checkSchema', () => {
     const problem = checkSchema(withVersion(SCHEMA_VERSION + 1));
     expect(problem?.kind).toBe('newer');
     expect(problem?.message).toContain(`format version ${SCHEMA_VERSION + 1}`);
-    expect(problem?.message).toContain(`CodeMap ${pkg.version}`);
-    expect(problem?.message).toMatch(/Update CodeMap/);
+    expect(problem?.message).toContain(`SeamMap ${pkg.version}`);
+    expect(problem?.message).toMatch(/Update SeamMap/);
   });
 
   it.runIf(SCHEMA_VERSION > 1)('rejects an older format version', () => {
@@ -50,7 +50,7 @@ describe('checkSchema', () => {
     const { schemaVersion: _, ...unversioned } = graph;
     const problem = checkSchema(unversioned);
     expect(problem?.kind).toBe('missing');
-    expect(problem?.message).toContain(`CodeMap ${pkg.version}`);
+    expect(problem?.message).toContain(`SeamMap ${pkg.version}`);
     expect(problem?.message).toMatch(/regenerate/);
   });
 

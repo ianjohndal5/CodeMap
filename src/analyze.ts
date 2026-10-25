@@ -101,7 +101,7 @@ export function analyze(opts: AnalyzeOptions): AnalyzeResult {
   const result: Graph = {
     schemaVersion: SCHEMA_VERSION,
     meta: {
-      tool: 'codemap',
+      tool: 'seammap',
       version: VERSION,
       backendRoot: opts.backend ? toPosix(opts.backend) : null,
       frontendRoot: opts.frontend ? toPosix(opts.frontend) : null,

@@ -20,7 +20,7 @@ export function extensionManifest(pkg, current = {}) {
     displayName: name,
     description: `${pkg.description}. Maps Laravel and Next.js code, the endpoints between them and an optional security lens, inside the editor; fully offline.`,
     version: pkg.version,
-    publisher: current.publisher ?? 'codemap-placeholder',
+    publisher: current.publisher ?? 'seammap-placeholder',
     license: pkg.license,
     ...(pkg.repository ? { repository: pkg.repository } : {}),
     ...(pkg.homepage ? { homepage: pkg.homepage } : {}),

@@ -43,7 +43,7 @@ async function main(req) {
     const { resolveRoots } = await import('./analyzer/detect.js');
 
     // The command line's rules (README: Configuration): the settings act like --backend, --frontend and --config,
-    // and the workspace folder like the monorepo root of `codemap <folder>`.
+    // and the workspace folder like the monorepo root of `seammap <folder>`.
     const starts = [];
     if (req.backend) starts.push({ dir: req.backend, label: 'backend root', role: 'backend' });
     if (req.frontend) starts.push({ dir: req.frontend, label: 'frontend root', role: 'frontend' });

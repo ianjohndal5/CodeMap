@@ -10,7 +10,7 @@ import type { SecurityReport } from '../src/security/types.js';
 
 const fixtures = path.resolve(__dirname, '..', 'fixtures');
 const sample = path.join(fixtures, 'sarif', 'sample.sarif');
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'codemap-sarif-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'seammap-sarif-'));
 afterAll(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
 function lens(options: Partial<SecurityOptions> = {}): SecurityReport {
@@ -93,7 +93,7 @@ describe('findings on the map', () => {
     expect(danger.endpoints).toEqual([]);
     expect(danger.entries).toEqual(['fe:src/app/billing/page.tsx']);
     const ep = report.endpoints.find((e) => e.id === 'endpoint:laravel:GET /api/billing/search')!;
-    expect(ep.findings).toBe(2); // the SARIF result and CodeMap's own raw-SQL check
+    expect(ep.findings).toBe(2); // the SARIF result and SeamMap's own raw-SQL check
   });
 
   it('gives findings stable, sorted ids', () => {
@@ -140,7 +140,7 @@ describe('local checks', () => {
   it('explains each hit and attaches it like a SARIF result', () => {
     const mass = report.findings.find((f) => f.ruleId === 'laravel.mass-assignment' && f.line === 16)!;
     expect(mass.message).toMatch(/Invoice sets \$guarded = \[\]/);
-    expect(mass).toMatchObject({ tool: 'codemap', node: 'be:App\\Http\\Controllers\\BillingController::store' });
+    expect(mass).toMatchObject({ tool: 'seammap', node: 'be:App\\Http\\Controllers\\BillingController::store' });
     expect(mass.endpoints.map((e) => e.id)).toEqual(['endpoint:laravel:POST /api/billing/invoices']);
   });
 

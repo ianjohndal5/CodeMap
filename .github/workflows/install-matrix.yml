@@ -109,11 +109,11 @@ jobs:
         run: |
           cd "$RUNNER_TEMP/consumer"
           # The installed command reports package.json's version (graph.json's meta.version is in the compare job).
-          reported="$(npx codemap --version)"
+          reported="$(npx seammap --version)"
           expected="$(node -p "require(require('path').join(process.env.GITHUB_WORKSPACE, 'package.json')).version")"
-          [ "$reported" = "$expected" ] || { echo "codemap --version printed '$reported', package.json says '$expected'"; exit 1; }
-          npx codemap --backend "$GITHUB_WORKSPACE/fixtures/laravel-api" --frontend "$GITHUB_WORKSPACE/fixtures/next-web" --json-only --out out/plain
-          npx codemap --backend "$GITHUB_WORKSPACE/fixtures/laravel-security" --frontend "$GITHUB_WORKSPACE/fixtures/next-security" --security --json-only --out out/security
+          [ "$reported" = "$expected" ] || { echo "seammap --version printed '$reported', package.json says '$expected'"; exit 1; }
+          npx seammap --backend "$GITHUB_WORKSPACE/fixtures/laravel-api" --frontend "$GITHUB_WORKSPACE/fixtures/next-web" --json-only --out out/plain
+          npx seammap --backend "$GITHUB_WORKSPACE/fixtures/laravel-security" --frontend "$GITHUB_WORKSPACE/fixtures/next-security" --security --json-only --out out/security
           mkdir -p "$GITHUB_WORKSPACE/graphs"
           node "$GITHUB_WORKSPACE/scripts/ci/normalize-graph.mjs" out/plain/graph.json "$GITHUB_WORKSPACE/graphs/plain.json"
           node "$GITHUB_WORKSPACE/scripts/ci/normalize-graph.mjs" out/security/graph.json "$GITHUB_WORKSPACE/graphs/security.json"
@@ -121,7 +121,7 @@ jobs:
         if: matrix.pm == 'npm'
         run: |
           npm install -g "$TGZ"
-          codemap --version
+          seammap --version
       - uses: actions/upload-artifact@v4
         with:
           name: graphs-${{ matrix.os }}-node${{ matrix.node }}-${{ matrix.pm }}
@@ -146,7 +146,7 @@ jobs:
           mkdir -p /tmp/consumer && cd /tmp/consumer
           echo '{"name":"consumer","version":"1.0.0","private":true}' > package.json
           npm install --no-audit --no-fund "$(ls "$GITHUB_WORKSPACE"/pkg/*.tgz)"
-          npx codemap --backend "$GITHUB_WORKSPACE/fixtures/laravel-api" --frontend "$GITHUB_WORKSPACE/fixtures/next-web" --json-only --out out
+          npx seammap --backend "$GITHUB_WORKSPACE/fixtures/laravel-api" --frontend "$GITHUB_WORKSPACE/fixtures/next-web" --json-only --out out
           mkdir -p "$GITHUB_WORKSPACE/graphs"
           node "$GITHUB_WORKSPACE/scripts/ci/normalize-graph.mjs" out/graph.json "$GITHUB_WORKSPACE/graphs/plain.json"
       - uses: actions/upload-artifact@v4
@@ -172,7 +172,7 @@ jobs:
           echo '{"name":"consumer","version":"1.0.0","private":true}' > package.json
           npm install --no-audit --no-fund "$(ls "$GITHUB_WORKSPACE"/pkg/*.tgz)"
           # A new network namespace has only a loopback device: any outbound connection fails.
-          sudo unshare --net -- sudo -u "$USER" env PATH="$PATH" bash -c "cd '$RUNNER_TEMP/consumer' && ip link set lo up 2>/dev/null; npx --offline codemap --backend '$GITHUB_WORKSPACE/fixtures/laravel-security' --frontend '$GITHUB_WORKSPACE/fixtures/next-security' --security --json-only --out out"
+          sudo unshare --net -- sudo -u "$USER" env PATH="$PATH" bash -c "cd '$RUNNER_TEMP/consumer' && ip link set lo up 2>/dev/null; npx --offline seammap --backend '$GITHUB_WORKSPACE/fixtures/laravel-security' --frontend '$GITHUB_WORKSPACE/fixtures/next-security' --security --json-only --out out"
           test -s out/graph.json
 
   compare:

@@ -184,10 +184,10 @@ export function analyzeSecurity(graph: Graph, adapters: Adapter[], options: Secu
   if (nextResult) {
     const mwr = nextResult.middleware;
     if (mwr) {
-      const where = mwr.matcher === null ? 'every path' : mwr.matcher === 'unknown' ? 'paths CodeMap could not read from config.matcher' : mwr.matcher.join(', ');
-      caveats.push(`${mwr.file} runs on ${where}; ${mwr.gates.length} access gate(s) found, ${mwr.gates.filter((g) => !g.evaluated).length} with path conditions CodeMap could not evaluate.`);
+      const where = mwr.matcher === null ? 'every path' : mwr.matcher === 'unknown' ? 'paths SeamMap could not read from config.matcher' : mwr.matcher.join(', ');
+      caveats.push(`${mwr.file} runs on ${where}; ${mwr.gates.length} access gate(s) found, ${mwr.gates.filter((g) => !g.evaluated).length} with path conditions SeamMap could not evaluate.`);
       if (mwr.conditional.length) caveats.push(`${mwr.file} matcher entries with has/missing conditions can be skipped by a request that sends (or leaves out) those headers or cookies, so gates under them are not counted: ${mwr.conditional.join('; ')}.`);
-      if (mwr.ignored.length) caveats.push(`${mwr.ignored.join(', ')} ${mwr.ignored.length === 1 ? 'is' : 'are'} not read by Next.js (it uses ${mwr.file}, next to the app directory); CodeMap ignores ${mwr.ignored.length === 1 ? 'it' : 'them'} too.`);
+      if (mwr.ignored.length) caveats.push(`${mwr.ignored.join(', ')} ${mwr.ignored.length === 1 ? 'is' : 'are'} not read by Next.js (it uses ${mwr.file}, next to the app directory); SeamMap ignores ${mwr.ignored.length === 1 ? 'it' : 'them'} too.`);
     }
     if (nextResult.inlineActions) caveats.push(`${nextResult.inlineActions} inline 'use server' function(s) inside other functions are not analyzed.`);
     caveats.push('Next.js states come from code that checks the session in handlers, server actions, their helpers and middleware. Supabase row-level security and other database-side rules are not read.');
@@ -321,7 +321,7 @@ function collectFindings(
       const node = placer.place(h.side, h.file, h.line);
       list.push({
         origin: 'check',
-        tool: 'codemap',
+        tool: 'seammap',
         ruleId: h.ruleId,
         title: titles.get(h.ruleId),
         level: 'warning',

@@ -1,9 +1,9 @@
 {
-  "name": "codemap",
-  "displayName": "CodeMap",
+  "name": "seammap",
+  "displayName": "SeamMap",
   "description": "Offline map of a Laravel backend and a Next.js frontend: which component calls which endpoint, and which code handles it. With an opt-in security lens.. Maps Laravel and Next.js code, the endpoints between them and an optional security lens, inside the editor; fully offline.",
   "version": "0.1.0",
-  "publisher": "codemap-placeholder",
+  "publisher": "ianjohndal5",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -38,72 +38,72 @@
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "In Restricted Mode, CodeMap still maps the code (it only reads files and never runs them) but ignores the \"security\" section of the workspace's codemap.config.json: an untrusted config could classify middleware so that unprotected routes look protected.",
+      "description": "In Restricted Mode, SeamMap still maps the code (it only reads files and never runs them) but ignores the \"security\" section of the workspace's seammap.config.json: an untrusted config could classify middleware so that unprotected routes look protected.",
       "restrictedConfigurations": [
-        "codemap.configFile"
+        "seammap.configFile"
       ]
     }
   },
   "activationEvents": [
-    "onWebviewPanel:codemap.map"
+    "onWebviewPanel:seammap.map"
   ],
   "contributes": {
     "commands": [
       {
-        "command": "codemap.open",
+        "command": "seammap.open",
         "title": "Open Map",
-        "category": "CodeMap",
+        "category": "SeamMap",
         "icon": "$(type-hierarchy)"
       },
       {
-        "command": "codemap.refresh",
+        "command": "seammap.refresh",
         "title": "Refresh Map",
-        "category": "CodeMap",
+        "category": "SeamMap",
         "icon": "$(refresh)"
       },
       {
-        "command": "codemap.revealFile",
+        "command": "seammap.revealFile",
         "title": "Show Current File on Map",
-        "category": "CodeMap"
+        "category": "SeamMap"
       }
     ],
     "menus": {
       "commandPalette": [
         {
-          "command": "codemap.revealFile",
+          "command": "seammap.revealFile",
           "when": "editorIsOpen"
         }
       ],
       "editor/title": [
         {
-          "command": "codemap.revealFile",
-          "when": "activeWebviewPanelId != 'codemap.map' && resourceScheme == file && codemap.mapOpen",
+          "command": "seammap.revealFile",
+          "when": "activeWebviewPanelId != 'seammap.map' && resourceScheme == file && seammap.mapOpen",
           "group": "navigation@99"
         }
       ]
     },
     "configuration": {
-      "title": "CodeMap",
+      "title": "SeamMap",
       "properties": {
-        "codemap.backend": {
+        "seammap.backend": {
           "type": "string",
           "default": "",
           "scope": "resource",
-          "markdownDescription": "Laravel project root, relative to the workspace folder (like `--backend`). Empty: from `codemap.config.json`, else detected."
+          "markdownDescription": "Laravel project root, relative to the workspace folder (like `--backend`). Empty: from `seammap.config.json`, else detected."
         },
-        "codemap.frontend": {
+        "seammap.frontend": {
           "type": "string",
           "default": "",
           "scope": "resource",
-          "markdownDescription": "Next.js project root, relative to the workspace folder (like `--frontend`). Empty: from `codemap.config.json`, else detected."
+          "markdownDescription": "Next.js project root, relative to the workspace folder (like `--frontend`). Empty: from `seammap.config.json`, else detected."
         },
-        "codemap.configFile": {
+        "seammap.configFile": {
           "type": "string",
           "default": "",
           "scope": "resource",
-          "markdownDescription": "Config file to use, relative to the workspace folder (like `--config`). Empty: the nearest `codemap.config.json` in or above the projects, as the command line looks for it."
+          "markdownDescription": "Config file to use, relative to the workspace folder (like `--config`). Empty: the nearest `seammap.config.json` in or above the projects, as the command line looks for it."
         },
-        "codemap.security": {
+        "seammap.security": {
           "type": "boolean",
           "default": false,
           "scope": "resource",

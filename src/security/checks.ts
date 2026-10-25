@@ -22,7 +22,7 @@ export const CHECK_RULES: CheckRule[] = [
     side: 'backend',
     title: 'Mass assignment from all request input',
     description:
-      "All request input ($request->all(), input(), except()) reaches forceFill/forceCreate/insert/upsert (which ignore $fillable and $guarded), or create/update/fill on a model whose $guarded is []. Calls on models CodeMap cannot resolve are not flagged.",
+      "All request input ($request->all(), input(), except()) reaches forceFill/forceCreate/insert/upsert (which ignore $fillable and $guarded), or create/update/fill on a model whose $guarded is []. Calls on models SeamMap cannot resolve are not flagged.",
   },
   {
     id: 'laravel.raw-sql-request-input',
@@ -53,7 +53,7 @@ export const CHECK_RULES: CheckRule[] = [
 
 /** Considered and left out, with the reason (shown in the report). */
 export const SKIPPED_RULES = [
-  { id: 'eval / new Function', why: 'ESLint (no-eval, no-new-func) and Semgrep catch these exactly; CodeMap has no framework context to add.' },
+  { id: 'eval / new Function', why: 'ESLint (no-eval, no-new-func) and Semgrep catch these exactly; SeamMap has no framework context to add.' },
 ];
 
 export interface CheckHit {

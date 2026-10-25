@@ -1,4 +1,4 @@
-/* CodeMap viewer — "ink" (dark) and "paper" (light) themes. Fonts are bundled (served from node_modules). */
+/* SeamMap viewer — "ink" (dark) and "paper" (light) themes. Fonts are bundled (served from node_modules). */
 
 @font-face { font-family: 'IBM Plex Sans'; src: url(vendor/fonts/ibm-plex-sans-latin-400-normal.woff2) format('woff2'); font-weight: 400; font-display: swap; }
 @font-face { font-family: 'IBM Plex Sans'; src: url(vendor/fonts/ibm-plex-sans-latin-500-normal.woff2) format('woff2'); font-weight: 500; font-display: swap; }

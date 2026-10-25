@@ -9,7 +9,7 @@ import { normalizeCallUrl } from '../src/match/url.js';
 import { parseSource } from '../src/parse.js';
 import type { UrlPart } from '../src/types.js';
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'codemap-base-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'seammap-base-'));
 afterAll(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
 function write(root: string, files: Record<string, string>) {

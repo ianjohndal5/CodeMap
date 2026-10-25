@@ -7,7 +7,7 @@ import { findProjects, readTsPaths, resolveRoots } from '../src/detect.js';
 import { parseJsonc } from '../src/util/jsonc.js';
 
 const fixtures = path.resolve(__dirname, '..', 'fixtures');
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'codemap-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'seammap-test-'));
 afterAll(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
 describe('project detection', () => {
@@ -50,15 +50,15 @@ describe('config and JSONC', () => {
     expect(parseJsonc('{ // c\n "a": "x,}//y", /* b */ "b": [1,2,], }')).toEqual({ a: 'x,}//y', b: [1, 2] });
   });
 
-  it('loads codemap.config.json relative to its directory', () => {
+  it('loads seammap.config.json relative to its directory', () => {
     const dir = path.join(tmp, 'cfg');
     fs.mkdirSync(dir);
     fs.writeFileSync(
-      path.join(dir, 'codemap.config.json'),
+      path.join(dir, 'seammap.config.json'),
       JSON.stringify({ backend: '../api', laravel: { apiPrefix: '/api/v2', exclude: ['app/Legacy/**'] }, next: { backendEnvVars: ['NEXT_PUBLIC_API_URL'] } }),
     );
     const { config, file } = loadConfig(undefined, dir);
-    expect(file).toBe(path.join(dir, 'codemap.config.json'));
+    expect(file).toBe(path.join(dir, 'seammap.config.json'));
     expect(config.backend).toBe(path.join(tmp, 'api'));
     expect(config.laravel).toMatchObject({ apiPrefix: '/api/v2', exclude: ['app/Legacy/**'] });
     expect(config.next.backendEnvVars).toEqual(['NEXT_PUBLIC_API_URL']);

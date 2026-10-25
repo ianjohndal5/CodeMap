@@ -5,7 +5,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { defaultConfig } from '../src/config.js';
 import { scanLaravel, scanNext } from '../src/scan.js';
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'codemap-scan-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'seammap-scan-'));
 afterAll(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
 function write(root: string, files: Record<string, string>) {

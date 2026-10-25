@@ -69,7 +69,7 @@ export function serve(opts: ServeOptions): Promise<{ url: string; server: http.S
       'cache-control': immutable ? 'max-age=86400' : 'no-store',
     });
     // The page title and header carry the product name from package.json (see brand.ts).
-    if (path.basename(file) === 'index.html') res.end(fs.readFileSync(file, 'utf8').replaceAll('CodeMap', DISPLAY_NAME));
+    if (path.basename(file) === 'index.html') res.end(fs.readFileSync(file, 'utf8').replaceAll('SeamMap', DISPLAY_NAME));
     else fs.createReadStream(file).pipe(res);
   };
 

@@ -7,7 +7,7 @@ import type { Confidence, Effect } from './types.js';
 
 /** Why something stayed unresolved. Keys are stable (used in graph.json and config hints). */
 export const UNKNOWN_LABELS: Record<string, string> = {
-  'custom-middleware': 'custom middleware CodeMap does not classify',
+  'custom-middleware': 'custom middleware SeamMap does not classify',
   'vendor-middleware': 'package middleware not in the catalog',
   'undefined-alias': 'middleware alias not defined in Kernel.php, bootstrap/app.php or a provider',
   'non-literal-middleware': 'middleware written as a non-literal expression',
@@ -16,13 +16,13 @@ export const UNKNOWN_LABELS: Record<string, string> = {
   'parent-controller-not-scanned': 'controller extends a class outside the project',
   'attribute-middleware': 'PHP attribute on the controller or action that may add middleware (not read)',
   'handler-not-found': 'handler code not found (FormRequest and in-code checks not inspected)',
-  'unknown-loader': 'route file loaded by code CodeMap did not see',
+  'unknown-loader': 'route file loaded by code SeamMap did not see',
   'check-in-code': 'access check in handler code whose effect was not evaluated',
   'next-handler': 'Next.js route handler (not analyzed)',
   'auth-library-route': "the auth library's own route (NextAuth handlers), not analyzed",
   'next-handler-not-found': 'Next.js handler function not found',
   'unresolved-auth-helper': 'auth-looking helper that could not be followed',
-  'wrapper-not-analyzed': 'route handler wrapped in a function CodeMap could not read',
+  'wrapper-not-analyzed': 'route handler wrapped in a function SeamMap could not read',
   'middleware-unevaluated': 'middleware.ts gate whose path condition was not evaluated',
 };
 
@@ -87,7 +87,7 @@ export class MiddlewareResolver {
     const target = alias?.target ?? (base.includes('\\') ? null : DEFAULT_ALIASES[base]);
     if (configured) {
       const key = group ? name : target ? target + params : name;
-      return [{ key, effect: configured.effect, detail: `${name}: ${configured.effect} (codemap.config.json)`, confidence: 'high' }];
+      return [{ key, effect: configured.effect, detail: `${name}: ${configured.effect} (seammap.config.json)`, confidence: 'high' }];
     }
     if (group && !stack.includes(name)) {
       return group.members.flatMap((m) => this.expand(m.name, m.text, [...stack, name]).map((l) => ({ ...l, detail: `group ${name} > ${l.detail}` })));
@@ -102,7 +102,7 @@ export class MiddlewareResolver {
       {
         key: name,
         effect: 'unknown',
-        detail: `alias '${base}' is not defined in the files CodeMap reads`,
+        detail: `alias '${base}' is not defined in the files SeamMap reads`,
         confidence: 'low',
         unknown: { reason: 'undefined-alias', name: base, hint: 'may be registered by a package; classify it in security config' },
       },
@@ -123,7 +123,7 @@ export class MiddlewareResolver {
   private classifyUncached(fqn: string): Leaf {
     const lookup = (name: string): { effect: Effect; label: string; how: string } | null => {
       const c = this.fromConfig([name]);
-      if (c) return { effect: c.effect, label: c.effect, how: 'codemap.config.json' };
+      if (c) return { effect: c.effect, label: c.effect, how: 'seammap.config.json' };
       const k = KNOWN_CLASSES.get(name.toLowerCase());
       return k ? { effect: k.effect, label: k.label, how: 'catalog' } : null;
     };
@@ -175,7 +175,7 @@ export class MiddlewareResolver {
     return {
       key: fqn,
       effect: 'unknown',
-      detail: `${short(fqn)} is project middleware CodeMap does not classify`,
+      detail: `${short(fqn)} is project middleware SeamMap does not classify`,
       confidence: 'low',
       unknown: { reason: 'custom-middleware', name: fqn, hint: this.hint(cls) },
     };

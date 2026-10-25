@@ -12,7 +12,7 @@ import { buildRegistry } from '../src/security/registry.js';
 import type { SecurityReport } from '../src/security/types.js';
 
 const fixtures = path.resolve(__dirname, '..', 'fixtures');
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'codemap-sec-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'seammap-sec-'));
 afterAll(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
 function write(root: string, files: Record<string, string>) {

@@ -136,7 +136,7 @@ export function renderInspectEmpty(app) {
       start?.classify
         ? `<div class="card start-card">
         <div class="card-title">${icon('target', 13)} Start with</div>
-        <p class="start-text"><b>Classify ${start.classify.middleware.length} middleware</b> to resolve ${fmt(start.classify.endpoints)} of the ${fmt(M.graph.security.summary.unknown)} unknown endpoints. CodeMap doesn't guess what custom middleware does.</p>
+        <p class="start-text"><b>Classify ${start.classify.middleware.length} middleware</b> to resolve ${fmt(start.classify.endpoints)} of the ${fmt(M.graph.security.summary.unknown)} unknown endpoints. SeamMap doesn't guess what custom middleware does.</p>
         <button class="btn primary" data-goto-tab="security">${icon('shield', 14)} Show them</button>
       </div>`
         : start
@@ -424,7 +424,7 @@ function configSnippet(names) {
 export function renderSecurity(app) {
   const { state, theme } = app;
   const sec = app.M.graph.security;
-  if (!sec) return '<p class="empty">Run CodeMap with <code>--security</code> to add the security lens.</p>';
+  if (!sec) return '<p class="empty">Run SeamMap with <code>--security</code> to add the security lens.</p>';
   const filter = state.secFilter;
   const barOf = (summary, n) =>
     SEC_STATES.map(([k]) => (summary[k] ? `<span style="width:${(summary[k] / (n || 1)) * 100}%;background:${theme.security[k]}" title="${esc(SEC_LABEL[k])}: ${summary[k]}"></span>` : '')).join('');
@@ -454,7 +454,7 @@ export function renderSecurity(app) {
     ${actionList.length > actionRows.length ? `<p class="muted small">Showing ${actionRows.length} of ${fmt(actionList.length)}.</p>` : ''}`
     : '';
   const mw = sec.nextMiddleware;
-  const runsOn = !mw ? '' : mw.matcher === null ? 'every path (no matcher)' : mw.matcher === 'unknown' ? 'a matcher CodeMap could not read' : mw.matcher.map((m) => `<code>${esc(m)}</code>`).join(' ');
+  const runsOn = !mw ? '' : mw.matcher === null ? 'every path (no matcher)' : mw.matcher === 'unknown' ? 'a matcher SeamMap could not read' : mw.matcher.map((m) => `<code>${esc(m)}</code>`).join(' ');
   const mwBlock = mw
     ? section(
         mw.file,
@@ -479,7 +479,7 @@ export function renderSecurity(app) {
   const meta = app.meta;
   const configWhere = meta.config
     ? `<code>${esc(meta.config.path)}</code> (relative to the ${meta.backendRoot ? 'backend' : 'frontend'} root)`
-    : `a new <code>codemap.config.json</code> in the ${meta.backendRoot ? 'backend' : 'frontend'} root`;
+    : `a new <code>seammap.config.json</code> in the ${meta.backendRoot ? 'backend' : 'frontend'} root`;
   // When a few middleware are all that keeps most unknowns unknown, that comes first (it never changes a state itself).
   const lead = sec.classifyFirst;
   const leadSnippet = lead ? configSnippet(lead.middleware) : '';
@@ -495,9 +495,9 @@ export function renderSecurity(app) {
             ${u?.hint ? `<p class="note">${esc(u.hint)}</p>` : ''}</div>`;
         })
         .join('')}
-      <div class="snippet-head"><span class="mono small">codemap.config.json</span><button class="icon-btn sm" data-copy="${esc(leadSnippet)}" title="Copy">${icon('copy', 13)}</button></div>
+      <div class="snippet-head"><span class="mono small">seammap.config.json</span><button class="icon-btn sm" data-copy="${esc(leadSnippet)}" title="Copy">${icon('copy', 13)}</button></div>
       <pre class="snippet">${esc(leadSnippet)}</pre>
-      <p class="muted small">Move each name to the list that matches what it does. States change only once you classify them: CodeMap never decides from a name.</p>
+      <p class="muted small">Move each name to the list that matches what it does. States change only once you classify them: SeamMap never decides from a name.</p>
     </div>`
     : '';
   return `
@@ -531,14 +531,14 @@ export function renderSecurity(app) {
       ),
       { open: unresolved.length > 0, empty: 'Nothing to classify.' },
     )}
-    ${snippet ? `<div class="card"><div class="card-title">codemap.config.json <button class="icon-btn sm" data-copy="${esc(snippet)}" title="Copy">${icon('copy', 13)}</button></div><p class="muted small">Move each entry to the list that matches what it does after reading it. The hints above are suggestions only.</p><pre class="snippet">${esc(snippet)}</pre></div>` : ''}
+    ${snippet ? `<div class="card"><div class="card-title">seammap.config.json <button class="icon-btn sm" data-copy="${esc(snippet)}" title="Copy">${icon('copy', 13)}</button></div><p class="muted small">Move each entry to the list that matches what it does after reading it. The hints above are suggestions only.</p><pre class="snippet">${esc(snippet)}</pre></div>` : ''}
     ${renderFindingsBlock(app, sec)}
     ${section('Caveats', sec.caveats.map((c) => `<p class="note">${esc(c)}</p>`), { open: true, empty: 'None.' })}
     ${section('Not checked', sec.notChecked.map((c) => `<p class="note">${esc(c)}</p>`), { open: true })}`;
 }
 
 // ---------------------------------------------------------------------------
-// Findings (imported SARIF results and CodeMap's local checks)
+// Findings (imported SARIF results and SeamMap's local checks)
 
 const LEVEL_ORDER = { error: 0, warning: 1, note: 2, none: 3 };
 const STATE_ORDER = { none: 0, unknown: 1, public: 2, signed: 3, authenticated: 4, authorization: 5 };
@@ -573,7 +573,7 @@ function findingRow(app, f, { here = false } = {}) {
       : f.node
         ? 'no known path from an endpoint (the call graph is incomplete)'
         : `not on the map: ${f.outside}`;
-  const who = f.origin === 'check' ? `CodeMap check · ${f.confidence} confidence` : f.tool;
+  const who = f.origin === 'check' ? `SeamMap check · ${f.confidence} confidence` : f.tool;
   return `<div class="finding" style="--l:${levelColor(app, f.level)}">
     <div class="finding-head"><span class="level">${esc(f.level)}${f.severity !== undefined ? ' ' + f.severity.toFixed(1) : ''}</span>
       <span class="finding-rule" title="${esc(f.ruleId)}">${esc(f.title ?? f.ruleId)}</span>${f.suppressed ? '<span class="tag">suppressed</span>' : ''}</div>
@@ -604,14 +604,14 @@ function renderFindingsBlock(app, sec) {
   return `
     <div class="card">
       <div class="card-title">Findings <span class="muted">${fmt(placed.length)} on the map</span></div>
-      <p class="muted small" style="margin:0 0 8px">Imported from your scanners (SARIF) and CodeMap's few local checks, each placed on the definition that contains it, with the endpoints that reach it through known calls.</p>
-      <div class="sec-chips">${chip('all', 'All', placed.length)}${chip('sarif', 'Imported', placed.filter((f) => f.origin === 'sarif').length)}${chip('check', 'CodeMap checks', placed.filter((f) => f.origin === 'check').length)}</div>
+      <p class="muted small" style="margin:0 0 8px">Imported from your scanners (SARIF) and SeamMap's few local checks, each placed on the definition that contains it, with the endpoints that reach it through known calls.</p>
+      <div class="sec-chips">${chip('all', 'All', placed.length)}${chip('sarif', 'Imported', placed.filter((f) => f.origin === 'sarif').length)}${chip('check', 'SeamMap checks', placed.filter((f) => f.origin === 'check').length)}</div>
     </div>
     ${section('Findings', shown.slice(0, 150).map((f) => findingRow(app, f)), { count: shown.length, empty: 'No findings.' })}
     ${shown.length > 150 ? `<p class="muted small">Showing 150 of ${fmt(shown.length)}.</p>` : ''}
     ${outside.length ? section('Not on the map', outside.slice(0, 100), { open: false, count: outside.length }) : ''}
     ${imports.length ? section('Imported SARIF files', imports, { open: false }) : ''}
-    ${rules.length ? section('CodeMap checks', [...rules, ...skipped], { open: false, count: rules.length }) : ''}`;
+    ${rules.length ? section('SeamMap checks', [...rules, ...skipped], { open: false, count: rules.length }) : ''}`;
 }
 
 // ---------------------------------------------------------------------------

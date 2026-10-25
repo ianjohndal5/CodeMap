@@ -124,7 +124,7 @@ export class LaravelSecurity {
       f.middleware.push(label);
       for (const leaf of leaves) this.leafSignal(f, leaf, e, false);
     }
-    if (r.loader === 'unknown') f.unknown.push({ reason: 'unknown-loader', text: `${r.file} is not loaded by bootstrap/app.php or a route provider CodeMap read` });
+    if (r.loader === 'unknown') f.unknown.push({ reason: 'unknown-loader', text: `${r.file} is not loaded by bootstrap/app.php or a route provider SeamMap read` });
     if (r.loader === 'convention') f.notes.push(`${r.file} assumed to be loaded with the '${r.file === 'routes/api.php' ? 'api' : 'web'}' group (Laravel convention; no loader found)`);
 
     // Handler code: FormRequest authorize(), checks in the body, and checks one or two calls away.

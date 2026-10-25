@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// SARIF 2.1.0 import. CodeMap only reads results the user produced with their own scanners
+// SARIF 2.1.0 import. SeamMap only reads results the user produced with their own scanners
 // (Semgrep, CodeQL, Psalm, ESLint...); nothing is executed here.
 
 export type Level = 'error' | 'warning' | 'note' | 'none';

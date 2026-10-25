@@ -118,7 +118,7 @@ export const ATTR_MIDDLEWARE = 'illuminate\\routing\\attributes\\controllers\\mi
 export const ATTR_AUTHORIZE = 'illuminate\\routing\\attributes\\controllers\\authorize';
 export const ATTR_WITHOUT = 'illuminate\\routing\\attributes\\controllers\\withoutmiddleware';
 
-/** Package route registrations CodeMap cannot see, keyed by composer package. */
+/** Package route registrations SeamMap cannot see, keyed by composer package. */
 export const ROUTE_PACKAGES: Record<string, string> = {
   'laravel/sanctum': 'Sanctum registers /sanctum/csrf-cookie',
   'laravel/fortify': 'Fortify registers login, registration, password reset and 2FA routes',

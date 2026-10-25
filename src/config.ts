@@ -28,7 +28,7 @@ export interface NextOptions {
   /** host[:port] values of absolute URLs that point at the Laravel backend. localhost/127.0.0.1 always count. */
   backendHosts: string[];
   /**
-   * Path the backend base URL carries, when it lives in .env (which CodeMap never reads):
+   * Path the backend base URL carries, when it lives in .env (which SeamMap never reads):
    * "/api" for every base, or per variable, e.g. { "NEXT_PUBLIC_API_URL": "/api" }.
    */
   backendBasePath?: string | Record<string, string>;
@@ -49,7 +49,7 @@ export interface SecurityOptions {
   ignoreMiddleware: string[];
   /** SARIF files to import (relative to the config file); --sarif adds more. */
   sarif: string[];
-  /** Run CodeMap's local pattern checks (default true). */
+  /** Run SeamMap's local pattern checks (default true). */
   checks: boolean;
   /** Check ids to skip, e.g. "js.token-in-web-storage". */
   disableChecks: string[];
@@ -157,7 +157,7 @@ function namedRoots(file: string, starts: ConfigStart[]): number {
 
 /**
  * The config file that belongs to the projects, independent of the current directory: the nearest
- * codemap.config.json in or above each start folder, up to the repository root (outside a git repository, up
+ * seammap.config.json in or above each start folder, up to the repository root (outside a git repository, up
  * to the folder holding all the starts). When several starts find different files, the one whose `backend` /
  * `frontend` names the most of the projects wins, then the closest, then the earlier start (backend first).
  */
@@ -196,7 +196,7 @@ function canonical(value: unknown): string {
 }
 
 /**
- * Load codemap.config.json. `explicit` is a path (relative to `cwd`) that must exist; without it, the file in
+ * Load seammap.config.json. `explicit` is a path (relative to `cwd`) that must exist; without it, the file in
  * `cwd` is used when present (the CLI picks the file with findConfig instead). Relative paths inside it resolve
  * against the config file's directory.
  */

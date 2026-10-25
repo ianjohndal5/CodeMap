@@ -15,7 +15,7 @@ export const STATES: ProtectionState[] = ['authorization', 'authenticated', 'sig
 
 export type Confidence = 'high' | 'medium' | 'low';
 
-/** What one middleware or code check does to access, as far as CodeMap can tell. */
+/** What one middleware or code check does to access, as far as SeamMap can tell. */
 export type Effect = 'authorization' | 'authentication' | 'signed' | 'public' | 'unknown' | 'neutral';
 
 export interface Signal {
@@ -31,7 +31,7 @@ export interface Signal {
   line?: number;
 }
 
-/** An imported SARIF result or a CodeMap local check, placed on the graph. */
+/** An imported SARIF result or a SeamMap local check, placed on the graph. */
 export interface Finding {
   /** Stable across runs: origin/tool/rule@file:line (+#n for repeats). */
   id: string;
@@ -42,7 +42,7 @@ export interface Finding {
   level: 'error' | 'warning' | 'note' | 'none';
   /** SARIF security-severity (0-10), when the scanner provides it. */
   severity?: number;
-  /** For CodeMap checks. */
+  /** For SeamMap checks. */
   confidence?: Confidence;
   message: string;
   side: 'backend' | 'frontend' | null;
@@ -110,7 +110,7 @@ export interface SecurityReport {
     aliases: { name: string; target: string; source: string }[];
     groups: { name: string; members: string[]; source: string }[];
     global: { name: string; effect: Effect; detail: string }[];
-    /** Middleware CodeMap could not classify, with how many endpoints it is decisive for. */
+    /** Middleware SeamMap could not classify, with how many endpoints it is decisive for. */
     unresolved: { name: string; reason: string; endpoints: number; decisive: number; hint?: string }[];
   };
   caveats: string[];
@@ -123,7 +123,7 @@ export interface SecurityReport {
   /** Next.js server actions, assessed like endpoints. */
   actions: EndpointSecurity[];
   actionSummary: Record<ProtectionState, number>;
-  /** Next.js middleware.ts / proxy.ts: where it runs and which gates CodeMap could evaluate. */
+  /** Next.js middleware.ts / proxy.ts: where it runs and which gates SeamMap could evaluate. */
   nextMiddleware: {
     file: string;
     matcher: string[] | null | 'unknown';

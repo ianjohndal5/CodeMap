@@ -78,12 +78,12 @@ export function resolveRoots(opts: { backend?: string; frontend?: string; root?:
     if (!backend && !frontend) {
       throw new Error(
         `No Laravel project (composer.json + artisan) or Next.js project (package.json with a "next" dependency) found under ${opts.root}.\n` +
-          'Pass the projects explicitly: codemap --backend <laravelPath> --frontend <nextPath>',
+          'Pass the projects explicitly: seammap --backend <laravelPath> --frontend <nextPath>',
       );
     }
   }
   if (!backend && !frontend) {
-    throw new Error('Nothing to analyze. Usage: codemap --backend <laravelPath> --frontend <nextPath>  or  codemap <monorepoRoot>');
+    throw new Error('Nothing to analyze. Usage: seammap --backend <laravelPath> --frontend <nextPath>  or  seammap <monorepoRoot>');
   }
   if (backend) {
     backend = path.resolve(backend);

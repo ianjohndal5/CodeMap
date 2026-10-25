@@ -16,7 +16,7 @@ class AbortedParser {
 }
 setParserRuntime({ Parser: AbortedParser, Query: class {} as unknown as ParserRuntime['Query'], languages: { php: {}, ts: {}, tsx: {}, js: {} } } as unknown as ParserRuntime);
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'codemap-abort-'));
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'seammap-abort-'));
 afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 describe('a parser runtime that runs out of memory', () => {

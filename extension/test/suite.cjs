@@ -139,11 +139,11 @@ exports.run = async () => {
     api.showGraph(newer);
     const m = await problem;
     assert.equal(m.kind, 'newer');
-    assert.match(m.message, /format version 999, written by CodeMap 9\.0\.0/);
+    assert.match(m.message, /format version 999, written by SeamMap 9\.0\.0/);
   });
 
   await test("ignores the config's security section in Restricted Mode", async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'codemap-untrusted-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'seammap-untrusted-'));
     fs.cpSync(path.join(workspace, 'api'), path.join(dir, 'api'), { recursive: true });
     fs.writeFileSync(path.join(dir, `${id}.config.json`), JSON.stringify({ backend: 'api', security: { authMiddleware: ['api'] } }));
     const runWorker = (untrusted) =>

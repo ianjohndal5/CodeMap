@@ -86,7 +86,7 @@ interface FnResult {
   deniesByThrow: boolean;
   /** Compares a request header or token with a configured secret (cron / webhook style). */
   checksSecret: boolean;
-  /** Not read to the end: a project call past the depth limit, or an auth-named call CodeMap could not read through. */
+  /** Not read to the end: a project call past the depth limit, or an auth-named call SeamMap could not read through. */
   opaque: boolean;
   /** Can also hand back nothing (`if (!token) return null`): its caller makes the decision, not this function. */
   softExit: boolean;
@@ -134,7 +134,7 @@ function scopeOf(node: SyntaxNode, types: ReadonlySet<string>): SyntaxNode[] {
 const RESPONSE_DENY = /\.status\(\s*40[13]\s*\)|\.(json|send|end)\([^)]*\b(unauthori[sz]ed|unauthenticated|forbidden)\b/i;
 
 /**
- * Callee names that say they authenticate or authorize. When CodeMap cannot tell what such a function
+ * Callee names that say they authenticate or authorize. When SeamMap cannot tell what such a function
  * checks but a guard stops the request on its result, the endpoint is unknown, not "no protection".
  * Factories (`createAdminClient`) are left out.
  */
@@ -233,7 +233,7 @@ function innerCall(call: SyntaxNode): SyntaxNode {
   return call;
 }
 
-/** An auth-named call CodeMap could not classify: `shadowAuth(...)`, `AuthService.check(...)`. */
+/** An auth-named call SeamMap could not classify: `shadowAuth(...)`, `AuthService.check(...)`. */
 function strongAuthCall(call: SyntaxNode): string | null {
   const c = innerCall(call);
   const name = calleeName(c);
@@ -564,7 +564,7 @@ export class NextSecurity {
   }
 
   /**
-   * An auth helper CodeMap could not read through that may stop the request itself: its name says it enforces
+   * An auth helper SeamMap could not read through that may stop the request itself: its name says it enforces
    * (`authorizeRequest`, `requireX`), or it stops on something it could not read (`if (!(await shadowAuth())) throw`).
    */
   private decidesUnread(call: SyntaxNode, file: string, depth: number): boolean {
@@ -631,7 +631,7 @@ export class NextSecurity {
     const ifs: SyntaxNode[] = [];
     /** Local `const x = ...` initializers, to tell `role = user.role` from `role = input.role`. */
     const inits = new Map<string, SyntaxNode>();
-    /** Locals bound from auth-named calls CodeMap could not classify (`result = await shadowAuth(...)`). */
+    /** Locals bound from auth-named calls SeamMap could not classify (`result = await shadowAuth(...)`). */
     const suspects = new Map<string, string>();
     // The same condition calls are read by several passes below: classify each once.
     const classified = new Map<string, ReturnType<NextSecurity['classifyCall']>>();
@@ -675,7 +675,7 @@ export class NextSecurity {
             const auth = strongAuthCall(call);
             if (auth && !this.readThrough(call, fn.file, depth)) {
               result.opaque = true;
-              // `const scope = await authorizeRequest(req)`: it may throw, on grounds CodeMap could not read.
+              // `const scope = await authorizeRequest(req)`: it may throw, on grounds SeamMap could not read.
               if (this.decidesUnread(call, fn.file, depth)) result.unfollowed.push({ name: auth, file: fn.file, line: n.startPosition.row + 1, checked: true });
             }
             if (auth && !this.readThrough(call, fn.file, depth)) for (const name of boundNames(n.childForFieldName(n.type === 'variable_declarator' ? 'name' : 'left'))) suspects.set(name, auth);
@@ -704,7 +704,7 @@ export class NextSecurity {
               for (const v of pe.passed) passedToEnforcer.add(v);
               continue;
             }
-            // `await verifyApiKey(req)` that CodeMap could not read through: it may throw.
+            // `await verifyApiKey(req)` that SeamMap could not read through: it may throw.
             const auth = strongAuthCall(call);
             if (auth && !this.readThrough(call, fn.file, depth)) {
               result.opaque = true;
@@ -841,7 +841,7 @@ export class NextSecurity {
         }
       }
       if (!(absent.length || inlineAbsent || secret || (role && hasAuthContext))) {
-        // The request stops on the result of an auth-named function CodeMap could not read: unknown, never "no protection".
+        // The request stops on the result of an auth-named function SeamMap could not read: unknown, never "no protection".
         const suspect = [...suspects.keys()].find((v) => wordRe(v).test(cond));
         const inlineSuspect = suspect
           ? null
@@ -1008,7 +1008,7 @@ const withoutErrors = (cond: string) => cond.replace(/\b\w*(Error|Err|error|err)
 
 export interface MiddlewareReport {
   file: string;
-  /** null: no matcher (runs on every path); 'unknown': a matcher CodeMap could not read. */
+  /** null: no matcher (runs on every path); 'unknown': a matcher SeamMap could not read. */
   matcher: string[] | null | 'unknown';
   /** Matcher entries with `has` / `missing` conditions: a request shaped by the client can skip them. */
   conditional: string[];
@@ -1485,7 +1485,7 @@ export function analyzeNext(next: NextAdapter, graph: Graph): NextAnalysis {
       const ref = sec.defFunction(rel, top.key);
       const f: NextFinding = { id, signals: [], unknown: [], notes: [`server action ${exported}() in ${rel}`] };
       if (ref) addFnSignals(sec, ref, f, 'handler');
-      else f.unknown.push({ reason: 'next-handler-not-found', text: `${rel}: ${exported} is not a function CodeMap could read` });
+      else f.unknown.push({ reason: 'next-handler-not-found', text: `${rel}: ${exported} is not a function SeamMap could read` });
       actions.push(f);
     }
   }
@@ -1544,7 +1544,7 @@ function handlerGroups(sec: NextSecurity, next: NextAdapter, handler: string, me
         if (entry && FUNCTION_TYPES.has(entry.type)) g.fns.push({ ref: { node: entry, file }, source: 'handler' });
         else if (entry?.type === 'call_expression') wrapperFunctions(sec, entry, file, verb, g);
         else if (entry?.type === 'identifier' && sec.resolveHelper(file, entry.text)) g.fns.push({ ref: sec.resolveHelper(file, entry.text)!, source: 'handler' });
-        else g.unknown.push({ reason: 'next-handler-not-found', text: `${verb} in ${file}: ${firstLine(v, 50)} is not a function CodeMap could read` });
+        else g.unknown.push({ reason: 'next-handler-not-found', text: `${verb} in ${file}: ${firstLine(v, 50)} is not a function SeamMap could read` });
         return g;
       });
     }

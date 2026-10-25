@@ -217,7 +217,7 @@ describe('module resolution', () => {
 
   it('tells excluded files and imports outside the project from broken imports', () => {
     // On disk but not among the scanned files (as when .gitignore'd or excluded by config).
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'codemap-excluded-'));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'seammap-excluded-'));
     fs.mkdirSync(path.join(root, 'src', 'generated'), { recursive: true });
     fs.writeFileSync(path.join(root, 'src', 'generated', 'ignored.ts'), 'export const x = 1;\n');
     const rx = new ModuleResolver(new Set(['src/app/page.tsx']), { baseDir: '', hasBaseUrl: false, paths: [{ pattern: '@/*', targets: ['./src/*'] }] }, root);

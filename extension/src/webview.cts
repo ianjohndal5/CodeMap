@@ -28,7 +28,7 @@ export function webviewHtml(webview: vscode.Webview, viewerDir: vscode.Uri, disp
   const settings = JSON.stringify(config).replace(/</g, '\\u003c');
   return fs
     .readFileSync(path.join(viewerDir.fsPath, 'index.html'), 'utf8')
-    .replaceAll('CodeMap', displayName)
+    .replaceAll('SeamMap', displayName)
     .replaceAll('<script ', `<script nonce="${nonce}" `)
     .replace(
       '<head>',

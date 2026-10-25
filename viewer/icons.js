@@ -1,4 +1,4 @@
-// 16x16 stroke icons (drawn for CodeMap) and the SVG "tabs" painted on the left of graph cards.
+// 16x16 stroke icons (drawn for SeamMap) and the SVG "tabs" painted on the left of graph cards.
 
 const P = {
   // Roles / kinds

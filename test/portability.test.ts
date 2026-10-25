@@ -9,7 +9,7 @@ import type { Graph } from '../src/types.js';
 // The same project must give the same graph.json on every OS. A Windows checkout usually has \r\n line ends,
 // and some Windows editors save a byte-order mark: neither may change a node, an edge or a message.
 const fixtures = path.resolve(__dirname, '..', 'fixtures');
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'codemap-crlf-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'seammap-crlf-'));
 afterAll(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
 const BOM = String.fromCharCode(0xfeff);

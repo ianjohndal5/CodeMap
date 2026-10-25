@@ -6,7 +6,7 @@ import { analyze } from '../src/analyze.js';
 import { defaultConfig } from '../src/config.js';
 
 // A small Laravel app where two custom middleware keep three endpoints unknown.
-const app = fs.mkdtempSync(path.join(os.tmpdir(), 'codemap-classify-'));
+const app = fs.mkdtempSync(path.join(os.tmpdir(), 'seammap-classify-'));
 afterAll(() => fs.rmSync(app, { recursive: true, force: true }));
 const files: Record<string, string> = {
   'composer.json': '{ "autoload": { "psr-4": { "App\\\\": "app/" } } }',

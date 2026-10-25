@@ -22,29 +22,29 @@ export interface SchemaProblem {
 export function checkSchema(graph: unknown): SchemaProblem | null {
   const g = graph as { schemaVersion?: unknown; meta?: { version?: unknown }; nodes?: unknown } | null;
   if (!g || typeof g !== 'object' || !Array.isArray(g.nodes)) {
-    return { kind: 'invalid', message: 'This file is not a graph.json written by CodeMap.' };
+    return { kind: 'invalid', message: 'This file is not a graph.json written by SeamMap.' };
   }
-  const writer = typeof g.meta?.version === 'string' ? `CodeMap ${g.meta.version}` : 'an unknown version of CodeMap';
+  const writer = typeof g.meta?.version === 'string' ? `SeamMap ${g.meta.version}` : 'an unknown version of SeamMap';
   const v = g.schemaVersion;
   if (v === undefined) {
     return {
       kind: 'missing',
-      message: `This graph.json has no format version (it says it was written by ${writer}), so it comes from a development build or another tool. Run codemap again to regenerate it.`,
+      message: `This graph.json has no format version (it says it was written by ${writer}), so it comes from a development build or another tool. Run seammap again to regenerate it.`,
     };
   }
   if (typeof v !== 'number' || !Number.isInteger(v) || v < 1) {
-    return { kind: 'invalid', message: `This graph.json has an invalid format version (${JSON.stringify(v)}). Run codemap again to regenerate it.` };
+    return { kind: 'invalid', message: `This graph.json has an invalid format version (${JSON.stringify(v)}). Run seammap again to regenerate it.` };
   }
   if (v > SCHEMA_VERSION) {
     return {
       kind: 'newer',
-      message: `This graph.json uses format version ${v}, written by ${writer}, but this version of CodeMap reads format version ${SCHEMA_VERSION}. Update CodeMap to open it, or run the codemap you have again to regenerate it.`,
+      message: `This graph.json uses format version ${v}, written by ${writer}, but this version of SeamMap reads format version ${SCHEMA_VERSION}. Update SeamMap to open it, or run the seammap you have again to regenerate it.`,
     };
   }
   if (v < SCHEMA_VERSION) {
     return {
       kind: 'older',
-      message: `This graph.json uses format version ${v}, written by ${writer}, but this version of CodeMap reads format version ${SCHEMA_VERSION}. Run codemap again to regenerate it.`,
+      message: `This graph.json uses format version ${v}, written by ${writer}, but this version of SeamMap reads format version ${SCHEMA_VERSION}. Run seammap again to regenerate it.`,
     };
   }
   return null;

@@ -6,7 +6,7 @@ import { analyze } from '../src/analyze.js';
 import { defaultConfig, findConfig, loadConfig } from '../src/config.js';
 import type { ConfigStart } from '../src/config.js';
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'codemap-config-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'seammap-config-'));
 afterAll(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
 /** Create files (path -> content) under a fresh folder; a value of null makes a directory. */
@@ -36,15 +36,15 @@ const tmpInGit = (() => {
 
 describe('findConfig', () => {
   it('finds the config at the repository root, wherever the command runs', () => {
-    const root = tree('repo', { '.git': null, 'api/x': '', 'web/x': '', 'codemap.config.json': '{}' });
+    const root = tree('repo', { '.git': null, 'api/x': '', 'web/x': '', 'seammap.config.json': '{}' });
     const found = findConfig(projects(root));
-    expect(found.file).toBe(path.join(root, 'codemap.config.json'));
+    expect(found.file).toBe(path.join(root, 'seammap.config.json'));
     expect(found.how).toBe('1 folder above the backend root');
     expect(found.searched).toEqual([path.join(root, 'api'), root, path.join(root, 'web')]);
   });
 
   it('does not look above the repository root', () => {
-    const root = tree('nested', { 'codemap.config.json': '{}', 'repo/.git': null, 'repo/api/x': '', 'repo/web/x': '' });
+    const root = tree('nested', { 'seammap.config.json': '{}', 'repo/.git': null, 'repo/api/x': '', 'repo/web/x': '' });
     const found = findConfig(projects(path.join(root, 'repo')));
     expect(found.file).toBeNull();
     expect(found.how).toBe('none found');
@@ -52,11 +52,11 @@ describe('findConfig', () => {
   });
 
   it('prefers the closest file, and lists the others', () => {
-    const root = tree('closest', { '.git': null, 'api/x': '', 'web/codemap.config.json': '{}', 'codemap.config.json': '{}' });
+    const root = tree('closest', { '.git': null, 'api/x': '', 'web/seammap.config.json': '{}', 'seammap.config.json': '{}' });
     const found = findConfig(projects(root));
-    expect(found.file).toBe(path.join(root, 'web', 'codemap.config.json'));
+    expect(found.file).toBe(path.join(root, 'web', 'seammap.config.json'));
     expect(found.how).toBe('in the frontend root; the closest');
-    expect(found.others).toEqual([path.join(root, 'codemap.config.json')]);
+    expect(found.others).toEqual([path.join(root, 'seammap.config.json')]);
   });
 
   it('prefers a config that names the analyzed projects over a closer or earlier one', () => {
@@ -64,31 +64,31 @@ describe('findConfig', () => {
     const root = tree('named', {
       '.git': null,
       'one/api/x': '',
-      'one/codemap.config.json': '{ "backend": "api", "frontend": "other-web" }',
+      'one/seammap.config.json': '{ "backend": "api", "frontend": "other-web" }',
       'two/web/x': '',
-      'two/codemap.config.json': '// for this pair\n{ "backend": "../one/api", "frontend": "web" }',
+      'two/seammap.config.json': '// for this pair\n{ "backend": "../one/api", "frontend": "web" }',
     });
     const found = findConfig([
       { dir: path.join(root, 'one', 'api'), label: 'backend root', role: 'backend' },
       { dir: path.join(root, 'two', 'web'), label: 'frontend root', role: 'frontend' },
     ]);
-    expect(found.file).toBe(path.join(root, 'two', 'codemap.config.json'));
+    expect(found.file).toBe(path.join(root, 'two', 'seammap.config.json'));
     expect(found.how).toBe('1 folder above the frontend root; it names these projects');
   });
 
   it('breaks a tie in favour of the backend', () => {
-    const root = tree('tie', { '.git': null, 'api/codemap.config.json': '{}', 'web/codemap.config.json': '{}' });
+    const root = tree('tie', { '.git': null, 'api/seammap.config.json': '{}', 'web/seammap.config.json': '{}' });
     const found = findConfig(projects(root));
-    expect(found.file).toBe(path.join(root, 'api', 'codemap.config.json'));
+    expect(found.file).toBe(path.join(root, 'api', 'seammap.config.json'));
     expect(found.how).toBe('in the backend root; as close as another, and the backend comes first');
   });
 
   it.runIf(!tmpInGit)('outside a repository, looks up to the folder holding both projects and no further', () => {
-    const root = tree('plain', { 'codemap.config.json': '{}', 'work/api/x': '', 'work/web/x': '' });
+    const root = tree('plain', { 'seammap.config.json': '{}', 'work/api/x': '', 'work/web/x': '' });
     expect(findConfig(projects(path.join(root, 'work'))).file).toBeNull();
-    fs.writeFileSync(path.join(root, 'work', 'codemap.config.json'), '{}');
+    fs.writeFileSync(path.join(root, 'work', 'seammap.config.json'), '{}');
     const found = findConfig(projects(path.join(root, 'work')));
-    expect(found.file).toBe(path.join(root, 'work', 'codemap.config.json'));
+    expect(found.file).toBe(path.join(root, 'work', 'seammap.config.json'));
     // With one project outside a repository, only its own folder counts.
     expect(findConfig([{ dir: path.join(root, 'work', 'web'), label: 'frontend root', role: 'frontend' }]).file).toBeNull();
   });
@@ -112,11 +112,11 @@ describe('the config recorded in graph.json', () => {
   });
 
   it('is relative to the backend root, or null without a config file', () => {
-    const dir = tree('record', { 'codemap.config.json': settings });
+    const dir = tree('record', { 'seammap.config.json': settings });
     const backend = path.join(fixtures, 'laravel-api');
-    const { config } = loadConfig(path.join(dir, 'codemap.config.json'), dir);
+    const { config } = loadConfig(path.join(dir, 'seammap.config.json'), dir);
     const graph = analyze({ backend, frontend: null, config }).graph;
-    expect(graph.meta.config).toEqual({ path: path.relative(backend, path.join(dir, 'codemap.config.json')).split(path.sep).join('/'), sha256: config.source!.sha256 });
+    expect(graph.meta.config).toEqual({ path: path.relative(backend, path.join(dir, 'seammap.config.json')).split(path.sep).join('/'), sha256: config.source!.sha256 });
     expect(analyze({ backend, frontend: null, config: defaultConfig() }).graph.meta.config).toBeNull();
   });
 });

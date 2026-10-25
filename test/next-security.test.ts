@@ -50,7 +50,7 @@ describe('security lens on fixtures/next-protection', () => {
       'GET /dashboard/export': 'authenticated',
       'POST /api/ai': 'none', // a configured API key says nothing about the caller
       'POST /api/ingest': 'unknown', // verifyGatewayToken() returns null without a token
-      'POST /api/partner': 'unknown', // stops on a package function CodeMap cannot read
+      'POST /api/partner': 'unknown', // stops on a package function SeamMap cannot read
       'POST /api/projects': 'authenticated',
       'POST /api/webhooks/stripe': 'authenticated',
     });

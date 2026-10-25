@@ -1,6 +1,6 @@
-# CodeMap
+# SeamMap
 
-CodeMap is a deterministic codebase visualizer for a **Laravel (PHP) backend** and a **Next.js (TypeScript/JavaScript) frontend**. It parses both projects with Tree-sitter, links frontend HTTP calls to Laravel routes by URL matching, and renders one interactive graph: **Laravel on the left, API endpoints in the middle, Next.js on the right**.
+SeamMap is a deterministic codebase visualizer for a **Laravel (PHP) backend** and a **Next.js (TypeScript/JavaScript) frontend**. It parses both projects with Tree-sitter, links frontend HTTP calls to Laravel routes by URL matching, and renders one interactive graph: **Laravel on the left, API endpoints in the middle, Next.js on the right**.
 
 The question it answers is *"which component calls which endpoint, which controller handles it, and what does that controller call next?"*. It uses no AI, no network services and no code from the analyzed projects. Everything comes from parsing source files, so the same input always gives the same `graph.json`.
 
@@ -24,18 +24,18 @@ The question it answers is *"which component calls which endpoint, which control
 
 ```bash
 cd my-project              # a Laravel app, a Next.js app, or a monorepo with both
-npx codemap .              # analyze, write .codemap/graph.json, open the viewer
-npx codemap . --security   # add the security lens
+npx seammap .              # analyze, write .seammap/graph.json, open the viewer
+npx seammap . --security   # add the security lens
 ```
 
-Or name the two projects: `npx codemap --backend ./api --frontend ./web`. The command analyzes the code, prints a summary with per-stage timings, serves the viewer on <http://localhost:5178/> and opens your browser. It never runs your projects, and nothing leaves your machine.
+Or name the two projects: `npx seammap --backend ./api --frontend ./web`. The command analyzes the code, prints a summary with per-stage timings, serves the viewer on <http://localhost:5178/> and opens your browser. It never runs your projects, and nothing leaves your machine.
 
-> **Name.** `codemap` is a placeholder: the name is taken on npm and crowded on the VS Code Marketplace, and the package is marked `private` until a final name is chosen (see [docs/PUBLISHING.md](docs/PUBLISHING.md)). Until it is published, run it from a clone (see *From source* below).
+> **Name.** `seammap` is a placeholder: the name is taken on npm and crowded on the VS Code Marketplace, and the package is marked `private` until a final name is chosen (see [docs/PUBLISHING.md](docs/PUBLISHING.md)). Until it is published, run it from a clone (see *From source* below).
 
 ## Installation
 
 * **Node.js 20 or newer.** Nothing else: no compiler, no Python, no build step.
-* **Try it** with `npx codemap ...`, **install it globally** with `npm install -g codemap` (or `pnpm add -g codemap`), or add it to a project with `npm install -D codemap` and run `npx codemap`.
+* **Try it** with `npx seammap ...`, **install it globally** with `npm install -g seammap` (or `pnpm add -g seammap`), or add it to a project with `npm install -D seammap` and run `npx seammap`.
 * **Platforms.** The package carries prebuilt Tree-sitter parsers for Linux, macOS and Windows, each on x64 and arm64. On Linux they need glibc 2.17 or newer, which is older than what Node 20 itself needs, so they run wherever Node does (Debian 12 and Ubuntu 22.04 included). Alpine Linux (musl) is supported on x64: the core parser ships a musl build, the grammar parsers load there as built, and CI runs `node:22-alpine`. Alpine on arm64 is not supported. Other platforms (32-bit ARM, FreeBSD...) get a clear error.
 * **Clean installs.** The published package has no native dependencies, no install scripts and no peer-dependency ranges, so npm and pnpm install it without warnings and without running anything. Download size is about 5.8 MB (39 MB unpacked, mostly the parsers for six platforms).
 * **Offline and private.** The analysis reads files and writes `graph.json`; the viewer is served from your machine on `localhost`, with Cytoscape, ELK and the fonts bundled. No telemetry, no update checks, no requests to any server.
@@ -49,7 +49,7 @@ npm run build        # TypeScript to dist/, query files, and the prebuilt parser
 node dist/cli.js --backend fixtures/laravel-api --frontend fixtures/next-web
 ```
 
-`npm run build` copies the parsers' prebuilt binaries from the dev-only Tree-sitter packages into `dist/native` (`scripts/vendor-native.mjs`): the published package ships those binaries and depends on none of the Tree-sitter packages, which is what keeps installs clean. A few upstream binaries are replaced by the rebuilds in `native-prebuilds/`: the core binding on every platform (upstream's crash in Node 20, and on Linux need GCC 13's libstdc++) and the TypeScript grammar on Linux arm64 (upstream's is an x86-64 binary). `native-prebuilds/README.md` explains, and the native-prebuilds workflow rebuilds them. `npm link` gives a global `codemap` command from the clone.
+`npm run build` copies the parsers' prebuilt binaries from the dev-only Tree-sitter packages into `dist/native` (`scripts/vendor-native.mjs`): the published package ships those binaries and depends on none of the Tree-sitter packages, which is what keeps installs clean. A few upstream binaries are replaced by the rebuilds in `native-prebuilds/`: the core binding on every platform (upstream's crash in Node 20, and on Linux need GCC 13's libstdc++) and the TypeScript grammar on Linux arm64 (upstream's is an x86-64 binary). `native-prebuilds/README.md` explains, and the native-prebuilds workflow rebuilds them. `npm link` gives a global `seammap` command from the clone.
 
 Parsing stack: `tree-sitter@0.25.1`, `tree-sitter-php@0.24.2` (its `php` export, which accepts the `<?php` tag and inline HTML; `php_only` is for tag-less PHP), `tree-sitter-typescript@0.23.2` (`typescript` for `.ts`, `tsx` for `.tsx`/`.jsx`) and `tree-sitter-javascript@0.25.0` (`.js`/`.mjs`/`.cjs`).
 
@@ -58,35 +58,35 @@ Parsing stack: `tree-sitter@0.25.1`, `tree-sitter-php@0.24.2` (its `php` export,
 The command line is the main way to use the tool. For scripts and integrations, the analysis itself is available:
 
 ```js
-import { analyze, loadConfig, resolveRoots } from 'codemap';
+import { analyze, loadConfig, resolveRoots } from 'seammap';
 
 const { graph } = analyze({ backend: '/path/to/api', frontend: '/path/to/web', security: true });
 console.log(graph.meta.stats, graph.security?.summary);
 ```
 
-`analyze()` takes `backend` and `frontend` roots (either may be `null`), an optional `config` (the shape of `codemap.config.json`; `findConfig(starts)` picks the file the CLI would use, `loadConfig(file, cwd)` reads one, defaults otherwise) and `security`, and returns `{ graph }`: exactly what the CLI writes to `graph.json`, with TypeScript types for every field. `resolveRoots()` and `findProjects()` expose the CLI's project detection, and `checkSchema(graph)` tells whether this version can read a `graph.json` (`SCHEMA_VERSION` is the format version it writes). The package is ESM; Node 20.19+ and 22.12+ can also `require()` it. These exports, the `graph.json` format, the command line and the config file are the public surface (see [Versioning](#versioning)); everything else is internal.
+`analyze()` takes `backend` and `frontend` roots (either may be `null`), an optional `config` (the shape of `seammap.config.json`; `findConfig(starts)` picks the file the CLI would use, `loadConfig(file, cwd)` reads one, defaults otherwise) and `security`, and returns `{ graph }`: exactly what the CLI writes to `graph.json`, with TypeScript types for every field. `resolveRoots()` and `findProjects()` expose the CLI's project detection, and `checkSchema(graph)` tells whether this version can read a `graph.json` (`SCHEMA_VERSION` is the format version it writes). The package is ESM; Node 20.19+ and 22.12+ can also `require()` it. These exports, the `graph.json` format, the command line and the config file are the public surface (see [Versioning](#versioning)); everything else is internal.
 
 ### Editor extension (VS Code)
 
-`extension/` is the same analyzer and the same viewer as a VS Code extension: **CodeMap: Open Map** analyzes the workspace in a background process (with progress and cancel) and opens the map in an editor tab; clicking through opens files at the right line beside it; the active editor's file is highlighted on the map; the status bar says when files changed since the analysis. Settings (`codemap.backend`, `codemap.frontend`, `codemap.configFile`, `codemap.security`) act like the CLI's options, and the config file is found by the same rule. It is one universal package for every platform, works over remote development (WSL, SSH, containers), supports Restricted Mode, and makes no network requests. See [`extension/README.md`](extension/README.md).
+`extension/` is the same analyzer and the same viewer as a VS Code extension: **SeamMap: Open Map** analyzes the workspace in a background process (with progress and cancel) and opens the map in an editor tab; clicking through opens files at the right line beside it; the active editor's file is highlighted on the map; the status bar says when files changed since the analysis. Settings (`seammap.backend`, `seammap.frontend`, `seammap.configFile`, `seammap.security`) act like the CLI's options, and the config file is found by the same rule. It is one universal package for every platform, works over remote development (WSL, SSH, containers), supports Restricted Mode, and makes no network requests. See [`extension/README.md`](extension/README.md).
 
 ```bash
 npm ci && npm run build                     # the analyzer, in dist/
 cd extension && npm ci && npm run build     # the extension, in extension/out/
 npm test                                    # integration tests in a downloaded VS Code (CODE_EXECUTABLE=... for a local one)
-npm run package                             # dist-extension/codemap-<version>.vsix; install it with code --install-extension
+npm run package                             # dist-extension/seammap-<version>.vsix; install it with code --install-extension
 ```
 
 ## Usage
 
 ```
-codemap --backend <laravelPath> --frontend <nextPath> [options]
-codemap <monorepoRoot> [options]
+seammap --backend <laravelPath> --frontend <nextPath> [options]
+seammap <monorepoRoot> [options]
 
   -b, --backend <path>   Laravel project root
   -f, --frontend <path>  Next.js project root
-  -c, --config <file>    config file (default: the nearest codemap.config.json in or above the projects)
-  -o, --out <dir>        output directory for graph.json (default: .codemap)
+  -c, --config <file>    config file (default: the nearest seammap.config.json in or above the projects)
+  -o, --out <dir>        output directory for graph.json (default: .seammap)
   -p, --port <n>         viewer port (default: 5178; the next free port is used if busy)
       --no-open          do not open the browser
       --json-only        write graph.json and exit without serving
@@ -95,8 +95,8 @@ codemap <monorepoRoot> [options]
       --sarif <files...> import SARIF results from your own scanners (implies --security)
 ```
 
-* **Output:** `<out>/graph.json`, by default `.codemap/graph.json` in the current directory.
-* **Monorepo mode:** `codemap <root>` searches `<root>` and its subdirectories (3 levels deep, skipping `node_modules`, `vendor`, dot-directories and similar) for a Laravel project (`composer.json` + `artisan`) and a Next.js project (`package.json` with a `next` dependency). If it finds several candidates of one kind, or none at all, it stops and asks for `--backend` / `--frontend`.
+* **Output:** `<out>/graph.json`, by default `.seammap/graph.json` in the current directory.
+* **Monorepo mode:** `seammap <root>` searches `<root>` and its subdirectories (3 levels deep, skipping `node_modules`, `vendor`, dot-directories and similar) for a Laravel project (`composer.json` + `artisan`) and a Next.js project (`package.json` with a `next` dependency). If it finds several candidates of one kind, or none at all, it stops and asks for `--backend` / `--frontend`.
 * **One side only:** `--backend` alone or `--frontend` alone works; a warning says the other side is missing.
 * **Robustness:** a missing path, failed detection or an unparseable config file gives a clear error and exit code 1. An unreadable or unparseable source file never stops the run: it is logged, counted in `parseErrors`, and analysis continues. A missing `composer.json` (default `App\ => app/`) or `tsconfig.json` (no path aliases) only produces a warning.
 * **Exit codes:** `0` when the analysis ran (whatever it found, security findings included), `1` on any error: invalid arguments or config, no project found, unreadable paths. With `--json-only` the command writes `graph.json`, prints the summary and exits, which makes it usable in scripts; a future CI mode can add codes of its own without changing these.
@@ -127,16 +127,16 @@ The side panel has three tabs (four with `--security`):
 * **Security** (only with `--security`). See [Security lens](#security-lens---security).
 * **Filters.** Edge kinds and the per-group visibility switches.
 
-## Configuration (`codemap.config.json`)
+## Configuration (`seammap.config.json`)
 
 The config file is optional. Comments and trailing commas are allowed, and relative paths resolve against the config file's own directory. Command-line flags override `backend`/`frontend`.
 
 **Which file is used** does not depend on where you run the command:
 1. `--config <file>`, when given.
-2. Otherwise the nearest `codemap.config.json` to the projects: in the backend root and the frontend root (or the monorepo root you name, or the current folder when you name no project), then in the folders above them, up to the repository root (the folder with `.git`). Outside a git repository the search stops at the folder that holds all the named projects, so a lone project only checks its own folder.
+2. Otherwise the nearest `seammap.config.json` to the projects: in the backend root and the frontend root (or the monorepo root you name, or the current folder when you name no project), then in the folders above them, up to the repository root (the folder with `.git`). Outside a git repository the search stops at the folder that holds all the named projects, so a lone project only checks its own folder.
 3. When the backend and the frontend each lead to a different file, the one whose `backend`/`frontend` names the projects being analyzed wins, then the closer one, then the backend's. The others are listed as warnings.
 
-The summary always says which file was used and why (for example `../codemap.config.json (1 folder above the backend root)`), or that none was found and where it looked. `graph.json` records it in `meta.config` (see below), so two runs with different results can be told apart.
+The summary always says which file was used and why (for example `../seammap.config.json (1 folder above the backend root)`), or that none was found and where it looked. `graph.json` records it in `meta.config` (see below), so two runs with different results can be told apart.
 
 ```jsonc
 {
@@ -162,7 +162,7 @@ The summary always says which file was used and why (for example `../codemap.con
     "publicMiddleware": [],                     // treat like guest
     "ignoreMiddleware": ["App\\Http\\Middleware\\SetLocale"], // known not to restrict access
     "sarif": ["reports/semgrep.sarif"],         // scanner results to import (relative to this file)
-    "checks": true,                             // CodeMap's local checks
+    "checks": true,                             // SeamMap's local checks
     "disableChecks": []
   }
 }
@@ -284,9 +284,9 @@ The output is flat and close to the brief's format, with a few extra fields:
 {
   "schemaVersion": 1,           // format version, see "Versioning"
   "meta": {
-    "tool": "codemap", "version": "0.1.0",
+    "tool": "seammap", "version": "0.1.0",
     "backendRoot": "/abs/api", "frontendRoot": "/abs/web",
-    "config": { "path": "../codemap.config.json", "sha256": "…" }, // or null: the config used, relative to the backend root
+    "config": { "path": "../seammap.config.json", "sha256": "…" }, // or null: the config used, relative to the backend root
     "generatedAt": "…", "durationMs": 1234,
     "timings": { "scan": 0, "parse": 0, "extract": 0, "resolve": 0, "link": 0 },
     "stats": {
@@ -362,14 +362,14 @@ Plain HTML + JavaScript ES modules (`viewer/`, no build step) using Cytoscape.js
 ## Security lens (`--security`)
 
 ```bash
-codemap --backend ../api --frontend ../web --security
-codemap --backend ../api --frontend ../web --sarif semgrep.sarif eslint.sarif   # implies --security
+seammap --backend ../api --frontend ../web --security
+seammap --backend ../api --frontend ../web --sarif semgrep.sarif eslint.sarif   # implies --security
 ```
 
 The lens shows three things:
 * **Protection.** For each Laravel endpoint, Next.js route handler and server action, what the code declares about who may call it, and where that comes from.
 * **Imported findings.** Results from scanners you run yourself (SARIF), placed on the code that contains them, with the endpoints that reach that code.
-* **Local checks.** A handful of single-function pattern checks of CodeMap's own.
+* **Local checks.** A handful of single-function pattern checks of SeamMap's own.
 
 **It is a review aid, not a security scanner.** It points at places worth a look and certifies nothing. Without the flag nothing changes: `graph.json` gets no `security` key and no line ranges, and the run is no slower (both checked on every benchmark below).
 
@@ -391,7 +391,7 @@ The lens shows three things:
 | **Authenticated** | `auth`, `auth:<guard>`, `auth.basic`, `verified` or `password.confirm` applies (directly, through a group, an alias, or a class extending Laravel's), or middleware you listed in `authMiddleware`. In Next.js: code that stops the request without a signed-in user or a shared secret / signature, in the handler, a helper or a `middleware.ts` gate. |
 | **Signed URL** | `signed` applies and nothing stronger was found. |
 | **Public (guest)** | `guest` applies: the route is meant for anonymous users. |
-| **Unknown** | Something that could change the answer was not resolved: a custom or package middleware, an undefined alias, a non-literal middleware expression, closure middleware, controller middleware with unreadable `only`/`except`, a handler that wasn't found, a route file loaded by code CodeMap didn't see, or a check in code whose effect is unclear (`Auth::check()`, a `->can()` used as a value). In Next.js also: the session is read but nothing stops the request without it, a wrapper from a package, or an auth function CodeMap could not read through that decides whether the request goes on. |
+| **Unknown** | Something that could change the answer was not resolved: a custom or package middleware, an undefined alias, a non-literal middleware expression, closure middleware, controller middleware with unreadable `only`/`except`, a handler that wasn't found, a route file loaded by code SeamMap didn't see, or a check in code whose effect is unclear (`Auth::check()`, a `->can()` used as a value). In Next.js also: the session is read but nothing stops the request without it, a wrapper from a package, or an auth function SeamMap could not read through that decides whether the request goes on. |
 | **No protection found** | Everything that applies was resolved and none of it restricts access. Login pages and webhooks land here legitimately; it means "look", not "broken". |
 
 The strongest state wins, in the order of the table: an authentication middleware is not downgraded by an unrelated unknown one. **Unresolved or custom middleware never turns into "no protection found"**: anything that could hide an access check keeps an endpoint at `unknown`. Every state carries a confidence (high when middleware decides, medium for FormRequests and checks in the handler, low for checks found one or two calls away) and the signals it is based on, each with `file:line`.
@@ -426,18 +426,18 @@ Helpers that stop the request themselves count where they are called: `await req
 
 When one export dispatches by method (`export default withMiddlewares({ GET: ..., DELETE: ... })`), each method is decided separately and the endpoint shows the weakest, with a note listing them. Code in an immediately invoked function (`(async () => { const session = await auth(); ... })()`) counts as part of its handler for what it reads, but not for its guards: a `return` there only leaves the inner function.
 
-An `/admin` route where only a signed-in check was found gets the review flag "admin path, but no role or permission check was found": any account, a self-registered tenant included, may get in, unless a check CodeMap does not see (a database rule, a service it cannot follow) stops it.
+An `/admin` route where only a signed-in check was found gets the review flag "admin path, but no role or permission check was found": any account, a self-registered tenant included, may get in, unless a check SeamMap does not see (a database rule, a service it cannot follow) stops it.
 
-**Unknown, not "no protection".** The session is read but no guard uses it (`/api/feed` personalizes); a wrapper comes from a package; the route is NextAuth's own (`export const { GET, POST } = handlers`); an auth-named function that CodeMap could not read through (a package, or a call chain past the depth limit) decides whether the request goes on. An auth-named helper that CodeMap read to the end without finding a check (for example `hasUpstreamAuth()` returning `Boolean(process.env.KEY)`) is trusted as what it is.
+**Unknown, not "no protection".** The session is read but no guard uses it (`/api/feed` personalizes); a wrapper comes from a package; the route is NextAuth's own (`export const { GET, POST } = handlers`); an auth-named function that SeamMap could not read through (a package, or a call chain past the depth limit) decides whether the request goes on. An auth-named helper that SeamMap read to the end without finding a check (for example `hasUpstreamAuth()` returning `Boolean(process.env.KEY)`) is trusted as what it is.
 
-**`middleware.ts` / `proxy.ts`.** CodeMap reads the file Next.js reads: next to the `app` / `pages` directory (in `src/` when they live there), `proxy.ts` (Next.js 16) over `middleware.ts`; any other one is listed as ignored. Its `config.matcher` is evaluated (path-to-regexp, including negative lookaheads, and `{ source }` objects), and gates inside it (and in helpers it calls with the request, such as Supabase's `updateSession(request)`) are kept with their path conditions: `startsWith`, `===`, `.some(...)` / `.includes(...)` over constant arrays, and same-file helpers. A gate applies to a route only when the matcher covers it and the path condition evaluates to true for it; anything it cannot evaluate is reported, not assumed. A matcher entry with `has` / `missing` conditions (the common `missing: [{ type: 'header', key: 'next-router-prefetch' }]`) runs only when the request's headers or cookies allow it, which the client decides, so gates under it are never counted; the route gets a note and the report a caveat. The Security tab lists the matcher, the skippable entries and every gate.
+**`middleware.ts` / `proxy.ts`.** SeamMap reads the file Next.js reads: next to the `app` / `pages` directory (in `src/` when they live there), `proxy.ts` (Next.js 16) over `middleware.ts`; any other one is listed as ignored. Its `config.matcher` is evaluated (path-to-regexp, including negative lookaheads, and `{ source }` objects), and gates inside it (and in helpers it calls with the request, such as Supabase's `updateSession(request)`) are kept with their path conditions: `startsWith`, `===`, `.some(...)` / `.includes(...)` over constant arrays, and same-file helpers. A gate applies to a route only when the matcher covers it and the path condition evaluates to true for it; anything it cannot evaluate is reported, not assumed. A matcher entry with `has` / `missing` conditions (the common `missing: [{ type: 'header', key: 'next-router-prefetch' }]`) runs only when the request's headers or cookies allow it, which the client decides, so gates under it are never counted; the route gets a note and the report a caveat. The Security tab lists the matcher, the skippable entries and every gate.
 
 ### Imported findings (SARIF)
 
-`--sarif <files...>` (or `security.sarif` in the config) reads SARIF 2.1.0 logs from Semgrep, CodeQL, Psalm, ESLint with a SARIF formatter, or any other tool. **CodeMap only reads them: it never runs or bundles a scanner.**
+`--sarif <files...>` (or `security.sarif` in the config) reads SARIF 2.1.0 logs from Semgrep, CodeQL, Psalm, ESLint with a SARIF formatter, or any other tool. **SeamMap only reads them: it never runs or bundles a scanner.**
 
 1. **Read.** Each result's rule, level, `security-severity`, message (including rule `messageStrings` with arguments), location and suppression state are read. `pass` and `notApplicable` results are skipped. A file that does not parse is reported, never fatal.
-2. **Matched to a scanned file.** `file://` and absolute paths are made relative to the backend or frontend root. Relative paths (after `uriBaseId` / `originalUriBaseIds`) are tried as-is, then by a unique path suffix, since scanners often run from a monorepo root (`web/src/app/page.tsx` matches `src/app/page.tsx`). Results in files CodeMap does not analyze are kept and listed as **not on the map**, with the reason: vendor code, config files, CI workflows, ambiguous paths.
+2. **Matched to a scanned file.** `file://` and absolute paths are made relative to the backend or frontend root. Relative paths (after `uriBaseId` / `originalUriBaseIds`) are tried as-is, then by a unique path suffix, since scanners often run from a monorepo root (`web/src/app/page.tsx` matches `src/app/page.tsx`). Results in files SeamMap does not analyze are kept and listed as **not on the map**, with the reason: vendor code, config files, CI workflows, ambiguous paths.
 3. **Placed on the innermost definition** whose line range contains the result (a method rather than its class, a function rather than its file), else on the file. With `--security`, definitions carry `endLine` for this.
 4. **Context.**
    * The endpoints that reach that definition through known (certain) `handles`/`calls`/`renders` edges, with their protection state. `via: "class"` means they use the containing class, not necessarily that method.
@@ -457,11 +457,11 @@ Five single-function checks, chosen for precision over coverage. None follows da
 | `js.token-in-web-storage` | A token-like key (`token`, `jwt`, `auth`, `session`, `apiKey`...) is written to `localStorage`/`sessionStorage`. | The key is unrelated (`theme`), names tracking state (`analytics_session_id`), or the value is a literal. |
 | `next.public-env-secret` | Code reads `process.env.NEXT_PUBLIC_*` whose name contains `SECRET`, `PRIVATE`, `PASSWORD` or `SERVICE_ROLE` (inlined into the browser bundle). | The name is publishable (`..._PUBLISHABLE_KEY`) or merely `_KEY`/`_TOKEN` (too often public by design). |
 
-`eval` / `new Function` was left out: ESLint (`no-eval`, `no-new-func`) and Semgrep catch it exactly, and CodeMap has no framework context to add. Turn checks off with `"checks": false`, or skip some with `"disableChecks": ["js.token-in-web-storage"]`.
+`eval` / `new Function` was left out: ESLint (`no-eval`, `no-new-func`) and Semgrep catch it exactly, and SeamMap has no framework context to add. Turn checks off with `"checks": false`, or skip some with `"disableChecks": ["js.token-in-web-storage"]`.
 
 ### Configuration
 
-Classify what CodeMap cannot. Entries match an alias (`tenant`), an alias with parameters (`role:admin`), a group name, or a class FQN, case-insensitively. The CLI summary and the Security tab list the unresolved middleware that decide the most endpoints, so a few lines of config usually settle most unknowns. When a few of them (at most five) are all that keeps most unknown endpoints unknown, that comes first: at the top of the security summary and the Security tab, and as the viewer's "Start with" suggestion when it concerns a quarter of the endpoints or more, with a ready-to-edit snippet. For example: "classify 4 middleware to resolve 398 of the 464 unknown endpoints". The count is exact (classifying those names gives exactly that many endpoints a state), and nothing changes until you classify them: CodeMap never decides from a name or a hint.
+Classify what SeamMap cannot. Entries match an alias (`tenant`), an alias with parameters (`role:admin`), a group name, or a class FQN, case-insensitively. The CLI summary and the Security tab list the unresolved middleware that decide the most endpoints, so a few lines of config usually settle most unknowns. When a few of them (at most five) are all that keeps most unknown endpoints unknown, that comes first: at the top of the security summary and the Security tab, and as the viewer's "Start with" suggestion when it concerns a quarter of the endpoints or more, with a ready-to-edit snippet. For example: "classify 4 middleware to resolve 398 of the 464 unknown endpoints". The count is exact (classifying those names gives exactly that many endpoints a state), and nothing changes until you classify them: SeamMap never decides from a name or a hint.
 
 ```jsonc
 "security": {
@@ -470,7 +470,7 @@ Classify what CodeMap cannot. Entries match an alias (`tenant`), an alias with p
   "publicMiddleware": [],        // meant for guests
   "ignoreMiddleware": [],        // does not restrict access (headers, locale, logging...)
   "sarif": ["reports/semgrep.sarif"], // relative to this file; --sarif adds more
-  "checks": true,                // CodeMap's local checks
+  "checks": true,                // SeamMap's local checks
   "disableChecks": []            // e.g. "next.public-env-secret"
 }
 ```
@@ -497,7 +497,7 @@ In the viewer:
 * The **Security** tab has:
   * the first step when a few middleware keep most unknowns unknown, the distribution, a review list (or one state at a time), why things are unknown, and a ready-to-edit config snippet
   * server actions (their distribution and the ones to review) and the `middleware.ts` matcher and gates
-  * the findings, reached-from-an-endpoint and weakest protection first, filterable by imported vs CodeMap checks, plus those not on the map, the SARIF import summary and the check list
+  * the findings, reached-from-an-endpoint and weakest protection first, filterable by imported vs SeamMap checks, plus those not on the map, the SARIF import summary and the check list
   * caveats and the full "not checked" list
 * Selecting an endpoint or a server action adds a **Protection** section (state, confidence, reason, middleware chain, signals with links to the line, notes, **Show reach**) and the findings reachable from it. Selecting a file, class or method lists the findings inside it.
 * **Show reach** and a finding's **path** use Chain focus with Isolate.
@@ -506,26 +506,26 @@ In the viewer:
 
 ### Validation
 
-**Protection.** Ground truth came from a validation-only script, kept in the scratchpad and never part of CodeMap. It booted each app and printed every route's resolved middleware (`Router::gatherRouteMiddleware`, i.e. what `php artisan route:list -v` shows, with groups expanded, controller middleware included and `withoutMiddleware` applied). The script compared that, route by route, with the endpoints CodeMap credits with authentication or authorization middleware.
+**Protection.** Ground truth came from a validation-only script, kept in the scratchpad and never part of SeamMap. It booted each app and printed every route's resolved middleware (`Router::gatherRouteMiddleware`, i.e. what `php artisan route:list -v` shows, with groups expanded, controller middleware included and `withoutMiddleware` applied). The script compared that, route by route, with the endpoints SeamMap credits with authentication or authorization middleware.
 
 | Project | Routes compared | Agreement | False "no protection found" | Unknown |
 | --- | --- | --- | --- | --- |
-| `fixtures/laravel-security` (Laravel 13 oracle) | 33 of 34 (the unloaded `legacy.php` route exists only for CodeMap) | 33/33 | 0 | 4 (all intended) |
+| `fixtures/laravel-security` (Laravel 13 oracle) | 33 of 34 (the unloaded `legacy.php` route exists only for SeamMap) | 33/33 | 0 | 4 (all intended) |
 | Breeze API (9 routes, also checked by hand) | 9 | 9/9 | 0 | 0 |
 | Firefly III, no config | 639 | 639/639 | 0 | 382 (60%) |
 | Firefly III, 12-entry config | 639 | 639/639 | 0 | 4 (0.6%) |
 
-Firefly's unknowns without config come from its own middleware: a global `SecureHeaders`, `Binder` in the web group, and its own `Authenticate` that does not extend Laravel's, plus closure middleware in every controller. Routes the apps register through packages (Passport `/oauth/*`, Sanctum, Ignition, `/up`) are absent from CodeMap's list, as documented above.
+Firefly's unknowns without config come from its own middleware: a global `SecureHeaders`, `Binder` in the web group, and its own `Authenticate` that does not extend Laravel's, plus closure middleware in every controller. Routes the apps register through packages (Passport `/oauth/*`, Sanctum, Ignition, `/up`) are absent from SeamMap's list, as documented above.
 
 **Next.js protection.** There is no route list to compare against, so the calibration was done by reading code. Every state change during development was checked against the handler and the helpers it calls, and handlers left at "no protection found" whose code mentions tokens, sessions or secrets were read one by one.
 * **`fixtures/next-protection`**: 20 route handlers, 5 server actions and a `middleware.ts`, each commented with the state it should get, including the traps found on real code (a positive role branch, a configured-key check, a form field named `role`, an optional token verifier, a helper that only checks configuration). All match.
 * **HomesPH** (Next.js 16, Supabase, 479 route handlers, 923 server actions): authorization 52 / authenticated 114 / unknown 44 / no protection found 269 handlers, and 669 / 147 / 6 / 101 actions. Its `middleware.ts` refreshes the session and gates password setup but never stops a signed-out request, and its matcher excludes `/api`; both show in the Security tab. False credits found and removed along the way: positive role branches, `if (!process.env.GEMINI_API_KEY)` read as a secret check (it had hidden nine AI-generation server actions that check nobody), a form field named `role`, `x !== null` read as "missing", `email || user.email` read as a check, and Supabase query chains read as auth calls.
-* **Langfuse web** (NextAuth, Pages Router, 127 handlers): authorization 3 / authenticated 18 / unknown 94 / no protection found 12. Most of the public API is unknown, on purpose: its API-key and RBAC pipeline (`shadowAuth`) sits deeper than CodeMap reads, and the endpoint says so. The 12 left at "no protection found" were read: NextAuth's own route, sign-up, sign-up verification (a CAPTCHA), SSO lookup, docs, the feedback form, health and readiness probes, the Slack OAuth callback, an MCP manifest, a static worker script and a generated protobuf file. Before the method-dispatch and wrapper handling, 103 of the 127 were "no protection found".
+* **Langfuse web** (NextAuth, Pages Router, 127 handlers): authorization 3 / authenticated 18 / unknown 94 / no protection found 12. Most of the public API is unknown, on purpose: its API-key and RBAC pipeline (`shadowAuth`) sits deeper than SeamMap reads, and the endpoint says so. The 12 left at "no protection found" were read: NextAuth's own route, sign-up, sign-up verification (a CAPTCHA), SSO lookup, docs, the feedback form, health and readiness probes, the Slack OAuth callback, an MCP manifest, a static worker script and a generated protobuf file. Before the method-dispatch and wrapper handling, 103 of the 127 were "no protection found".
 
 * **rentals-ph** (Next.js 16, NextAuth v5, Prisma, `src/` layout, 171 handlers): authorization 26 / authenticated 92 / unknown 9 / no protection found 44. Before NextAuth v5 support, 114 handlers were unknown because `auth` comes from `@/lib/auth`. The project also showed the proxy-file and matcher cases above: Next.js runs `src/proxy.ts` (a root `proxy.ts` with a wider matcher is ignored), and its matcher entries can be skipped with a `next-router-prefetch` header. Its gates only redirect when an `auth_token` cookie and a non-matching `user_role` cookie are both present, so none is counted. The 44 left at "no protection found" were read: listings, blogs, search, sign-up and password reset are public by design, two photo routes are disabled stubs, and `DELETE /api/ai/search/conversation/[id]` deletes any conversation by id with no check. Ten `/api/admin/*` handlers check only for a signed-in user, and the service they call has no role check: these carry the admin-path review flag.
 
-**Imported findings.** Semgrep 1.182 was run outside CodeMap, from the directory above each project, so its paths needed suffix matching:
-* **Firefly III** (`p/php`, `p/security-audit`, `p/owasp-top-ten`): 31 results. All 31 are in files CodeMap does not analyze (CI workflows, `config/`, nginx config, legacy JS assets, `server.php`), and all are listed as not on the map with that reason.
+**Imported findings.** Semgrep 1.182 was run outside SeamMap, from the directory above each project, so its paths needed suffix matching:
+* **Firefly III** (`p/php`, `p/security-audit`, `p/owasp-top-ten`): 31 results. All 31 are in files SeamMap does not analyze (CI workflows, `config/`, nginx config, legacy JS assets, `server.php`), and all are listed as not on the map with that reason.
 * **Langfuse web** (`p/react`, `p/nextjs`, `p/typescript`, `p/security-audit`, `p/owasp-top-ten`): 5 results. All 5 are placed on their Next.js handler, with the route handler endpoint and the entry file.
 
 `fixtures/sarif/sample.sarif` covers the format corners: `ruleIndex`, default levels, `messageStrings`, artifacts with `uriBaseId`, suppressions, `pass` results, files outside the map, and results without a location.
@@ -548,14 +548,14 @@ The rest of the difference is keeping syntax nodes and scopes alive for the lens
 
 ## Versioning
 
-Releases follow semantic versioning over a defined public surface: the command line (options, behavior, exit codes), the `codemap.config.json` keys, the `graph.json` format (fields and their meaning, node and finding ID formats, sort order) and the programmatic API (what the package exports). The viewer's interface, the terminal summary and the wording of messages are not part of it. [`docs/PUBLISHING.md`](docs/PUBLISHING.md#5-versioning) has the full definition.
+Releases follow semantic versioning over a defined public surface: the command line (options, behavior, exit codes), the `seammap.config.json` keys, the `graph.json` format (fields and their meaning, node and finding ID formats, sort order) and the programmatic API (what the package exports). The viewer's interface, the terminal summary and the wording of messages are not part of it. [`docs/PUBLISHING.md`](docs/PUBLISHING.md#5-versioning) has the full definition.
 
 * **Major** (from 1.0): something in the surface is removed, renamed or changes meaning.
 * **Minor:** additions, and changes where **results may differ**: better detection, a resolver fix or a new security heuristic changes edges, protection states or findings for unchanged code. The format stays the same, but runs of two versions are not directly comparable, so the [changelog](CHANGELOG.md) lists every such change under "Results may differ".
 * **Patch:** fixes that leave `graph.json` the same for the same code, apart from the per-run fields (`generatedAt`, `durationMs`, `timings`, the absolute roots).
 * **Before 1.0**, breaking changes bump the minor (0.1 → 0.2), and the changelog marks them **Breaking:**.
 
-`graph.json` starts with `schemaVersion`, an integer separate from the tool version in `meta.version`: it increases only when the format changes incompatibly, never for additions. The viewer checks it with `checkSchema()` and explains a file from another format version instead of drawing it. To compare runs over time, as CI would, pin the version (`npx codemap@<version>`).
+`graph.json` starts with `schemaVersion`, an integer separate from the tool version in `meta.version`: it increases only when the format changes incompatibly, never for additions. The viewer checks it with `checkSchema()` and explains a file from another format version instead of drawing it. To compare runs over time, as CI would, pin the version (`npx seammap@<version>`).
 
 ## Known limitations (deliberate)
 
@@ -669,7 +669,7 @@ cd extension && npm test       # the extension's integration tests in a real VS 
   * an `app/api/session/route.ts` handler called with a relative URL, which itself proxies to Laravel
   * the `@/` alias and a barrel file
   * a relative call that falls back to Laravel, an unknown-base call matched by suffix, and two unmatched calls
-* **`fixtures/laravel-security`:** security lens cases, each route commented with its expected state (guest, signed, `->can()`, nested groups with array options, `withoutMiddleware` and `excluded_middleware`, `bootstrap/app.php` aliases and `appendToGroup`, an alias to a subclass of `Authenticate`, an undefined alias, unclassified custom middleware, constructor middleware with `only`/`except`, `authorizeResource`, `HasMiddleware` with `new Middleware(..., only: ...)`, FormRequests returning `true` and a real check, `$this->authorize`, `Gate::denies` + `abort`, display-only `Auth::check()` and `->can()`, Laravel 13 `#[Middleware]`/`#[Authorize]`/`#[WithoutMiddleware]` attributes, a `then:`-loaded file and an unloaded one). It also has `BillingController` and an unguarded `Invoice` model for the local checks (each method says whether it should be flagged). It has no `artisan` file on purpose, so `codemap fixtures` still finds exactly one Laravel project.
+* **`fixtures/laravel-security`:** security lens cases, each route commented with its expected state (guest, signed, `->can()`, nested groups with array options, `withoutMiddleware` and `excluded_middleware`, `bootstrap/app.php` aliases and `appendToGroup`, an alias to a subclass of `Authenticate`, an undefined alias, unclassified custom middleware, constructor middleware with `only`/`except`, `authorizeResource`, `HasMiddleware` with `new Middleware(..., only: ...)`, FormRequests returning `true` and a real check, `$this->authorize`, `Gate::denies` + `abort`, display-only `Auth::check()` and `->can()`, Laravel 13 `#[Middleware]`/`#[Authorize]`/`#[WithoutMiddleware]` attributes, a `then:`-loaded file and an unloaded one). It also has `BillingController` and an unguarded `Invoice` model for the local checks (each method says whether it should be flagged). It has no `artisan` file on purpose, so `seammap fixtures` still finds exactly one Laravel project.
 * **`fixtures/next-security`:** frontend cases for the local checks (unsanitized and sanitized `dangerouslySetInnerHTML`, JSON-LD, a token in `localStorage`, secret-looking and publishable `NEXT_PUBLIC_` variables) calling `laravel-security` endpoints. It has no `package.json` on purpose, for the same reason.
 * **`fixtures/next-protection`:** Next.js protection cases, each handler and action commented with its expected state: Supabase `getUser()` + 401, a role 403, a public route, personalization only (unknown), a `withUser()` wrapper, a delegate, cron and webhook secrets (both branch styles), a flag set from a secret, a Stripe signature in `try`/`catch`, a package wrapper and a package verifier (unknown), an optional token verifier, a configuration-only "auth" helper, `assertAdmin(user)`, a Pages Router export dispatching by method with a static `AuthService` check, a route gated only by `middleware.ts`, and `'use server'` actions including the configured-key and form-`role` traps. No `package.json`, for the same reason.
 * **`fixtures/sarif/sample.sarif`:** a two-run SARIF log (Semgrep-style and ESLint-style) pointing at the security fixtures.
@@ -717,7 +717,7 @@ CHANGELOG.md        changes per release, including "Results may differ"
 ## Decisions where the brief was open
 
 * **Graph shape.**
-  * Output goes to `.codemap/graph.json` in the current directory (the config file, though, is looked up next to the projects). The default port is 5178, moving to the next free port if busy.
+  * Output goes to `.seammap/graph.json` in the current directory (the config file, though, is looked up next to the projects). The default port is 5178, moving to the next free port if busy.
   * Methods nest under their class, and classes under their file. The brief's example put methods directly under the file.
   * Extra edge kind `renders` for JSX usage, so component trees can be toggled separately from calls.
   * Repeated identical edges are merged with a `count`.

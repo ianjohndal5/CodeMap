@@ -1,6 +1,6 @@
 node_modules/
 /dist/
-/.codemap/
+/.seammap/
 # Local projects analyzed while developing (anchored: fixtures contain directories with these names)
 /legacy/
 /homes/
@@ -10,4 +10,6 @@ node_modules/
 /extension/node_modules/
 /extension/CHANGELOG.md
 /extension/LICENSE
+/extension/.vscode-test/
+/extension/out/
 /extension/.vscode-test/

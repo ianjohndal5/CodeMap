@@ -6,8 +6,8 @@ remove it.
 
 ## 1. Choose the name
 
-`codemap` is a placeholder. It is taken on npm (`codemap` 1.3.2, and `code-map`), and the VS Code Marketplace
-already has several "CodeMap" extensions, one of them long established (`oleg-shilo.codemap`). These names were
+`seammap` is a placeholder. It is taken on npm (`seammap` 1.3.2, and `code-map`), and the VS Code Marketplace
+already has several "SeamMap" extensions, one of them long established (`oleg-shilo.seammap`). These names were
 free on npm, the Marketplace and Open VSX on 2026-10-25 (check again before deciding; npm also rejects names that
 only differ by punctuation from an existing one, so `stack-map` or `route-lens` will not work):
 
@@ -17,7 +17,7 @@ only differ by punctuation from an existing one, so `stack-map` or `route-lens` 
 | `seammap` | SeamMap | Maps the seam between frontend and backend, where bugs and access gaps hide. |
 | `stackseam` | StackSeam | Same idea, reads as one word; less obviously a visualizer. |
 
-A scoped name (`@yourname/codemap`) is always available too, but it is longer to type in `npx`.
+A scoped name (`@yourname/seammap`) is always available too, but it is longer to type in `npx`.
 
 Then rename everything in one step on a clean working tree, and review the diff:
 
@@ -46,7 +46,7 @@ cytoscape-elk, commander, fast-glob, ignore and node-gyp-build (MIT), ELK (`elkj
 In `package.json`:
 
 * remove `"private": true`;
-* `"repository"`, `"homepage"` and `"bugs"` point at <https://github.com/ianjohndal5/CodeMap> (done). npm resolves
+* `"repository"`, `"homepage"` and `"bugs"` point at <https://github.com/ianjohndal5/SeamMap> (done). npm resolves
   the README's relative image links against `repository`, and the extension manifest copies all three. If the
   repository is renamed with the product (section 1), update them;
 * `"author"`.
@@ -75,11 +75,11 @@ What users and tools depend on. The README documents each part; the code is the 
 
 | Part | What it covers | Documented in | Code |
 | --- | --- | --- | --- |
-| Command line | The `[root]` argument and the options `--backend`, `--frontend`, `--config`, `--out`, `--port`, `--no-open`, `--json-only`, `--list`, `--security`, `--sarif`, `--version`, `--help`. Their behavior: `graph.json` written to `<out>/graph.json` (default `.codemap/`), the config file chosen by the lookup rule (README: Configuration) and named in the summary, flags overriding the config's roots, monorepo detection, the next free port when busy. Exit codes: `0` when the analysis ran, whatever it found; `1` on any error. | README: Usage | `src/cli.ts`, `src/brand.ts` |
-| Config file | Every key of `codemap.config.json`, with its type, default and meaning: `backend`, `frontend`; `laravel.apiPrefix`, `.controllerNamespace`, `.include`, `.exclude`; `next.include`, `.exclude`, `.backendEnvVars`, `.baseUrlVariables`, `.backendHosts`, `.backendBasePath`; `security.authMiddleware`, `.authorizationMiddleware`, `.publicMiddleware`, `.ignoreMiddleware`, `.sarif`, `.checks`, `.disableChecks`. Comments and trailing commas are allowed; relative paths resolve against the file's directory. | README: Configuration | `src/config.ts` |
+| Command line | The `[root]` argument and the options `--backend`, `--frontend`, `--config`, `--out`, `--port`, `--no-open`, `--json-only`, `--list`, `--security`, `--sarif`, `--version`, `--help`. Their behavior: `graph.json` written to `<out>/graph.json` (default `.seammap/`), the config file chosen by the lookup rule (README: Configuration) and named in the summary, flags overriding the config's roots, monorepo detection, the next free port when busy. Exit codes: `0` when the analysis ran, whatever it found; `1` on any error. | README: Usage | `src/cli.ts`, `src/brand.ts` |
+| Config file | Every key of `seammap.config.json`, with its type, default and meaning: `backend`, `frontend`; `laravel.apiPrefix`, `.controllerNamespace`, `.include`, `.exclude`; `next.include`, `.exclude`, `.backendEnvVars`, `.baseUrlVariables`, `.backendHosts`, `.backendBasePath`; `security.authMiddleware`, `.authorizationMiddleware`, `.publicMiddleware`, `.ignoreMiddleware`, `.sarif`, `.checks`, `.disableChecks`. Comments and trailing commas are allowed; relative paths resolve against the file's directory. | README: Configuration | `src/config.ts` |
 | `graph.json` | `schemaVersion`; every field of `meta`, nodes, edges, `unmatched`, `diagnostics` and `security`, with its type and meaning; the enumerations (node and edge kinds, `via`, protection states, finding origins and levels, unknown reasons); the node ID formats and finding IDs (`origin/tool/rule@file:line`); the sort order; determinism (the same code and version give the same file apart from the per-run fields). | README: `graph.json`, Security lens → Output and viewer | `src/types.ts`, `src/security/types.ts`, `src/schema.ts` |
 | API | What the package entry exports: `analyze`, `findConfig`, `loadConfig`, `defaultConfig`, `resolveRoots`, `findProjects`, `checkSchema`, `VERSION`, `SCHEMA_VERSION`, and the exported types. `exports` in `package.json` allows no other import path (besides `package.json` itself). | README: Programmatic API | `src/index.ts` |
-| Editor extension | Its command ids (`codemap.open`, `codemap.refresh`, `codemap.revealFile`), settings keys (`codemap.backend`, `codemap.frontend`, `codemap.configFile`, `codemap.security`) and their meaning, its id (`<publisher>.codemap`) and the VS Code versions it supports (`engines.vscode`). Renaming a settings key loses users' saved settings, so it is breaking. | `extension/README.md` | `scripts/extension-manifest.mjs`, `extension/src/` |
+| Editor extension | Its command ids (`seammap.open`, `seammap.refresh`, `seammap.revealFile`), settings keys (`seammap.backend`, `seammap.frontend`, `seammap.configFile`, `seammap.security`) and their meaning, its id (`<publisher>.seammap`) and the VS Code versions it supports (`engines.vscode`). Renaming a settings key loses users' saved settings, so it is breaking. | `extension/README.md` | `scripts/extension-manifest.mjs`, `extension/src/` |
 | Platforms | The supported Node.js versions (`engines`: 20 or newer) and the prebuilt platforms (Linux, macOS, Windows on x64 and arm64). | README: Installation | `package.json`, `native-prebuilds/` |
 
 Not part of the surface, so free to change in any release: the viewer's interface (layout, controls,
@@ -110,7 +110,7 @@ changelog marks breaking changes with **Breaking:**.
 the tool version in `meta.version`. Increase it only when a reader built for the current format would misread
 new files: a field removed or renamed, a field's type or meaning or an ID format changed, the structure
 reorganized. Additions don't change it. A bump is a breaking release with a **Breaking:** changelog entry, and
-`checkSchema()` then rejects files of the older version ("Run codemap again to regenerate it") unless reading
+`checkSchema()` then rejects files of the older version ("Run seammap again to regenerate it") unless reading
 them is added deliberately. Every reader (the viewer, the extension, the CI mode) calls `checkSchema()`, so the
 rule lives in one place.
 
@@ -150,11 +150,11 @@ convention `0.1.0` would read as a pre-release.
 
 ### Before the first release
 
-* **Name and publisher.** Settings keys (`codemap.security`, ...), command ids and the extension id
+* **Name and publisher.** Settings keys (`seammap.security`, ...), command ids and the extension id
   (`<publisher>.<name>`) become public with the first release, and renaming settings later breaks users' saved
   settings. Choose the name first (section 1); `node scripts/rename.mjs ... --publisher <id>` renames the
   extension with the rest and sets the publisher (`extension/package.json` has the placeholder
-  `codemap-placeholder`). The publisher id must exist on the Marketplace and as a namespace on Open VSX.
+  `seammap-placeholder`). The publisher id must exist on the Marketplace and as a namespace on Open VSX.
 * **License** (done). The `.vsix` contains `LICENSE` (copied from the root by the build) and says `MIT` in its
   manifest, which Open VSX requires. `extension/THIRD_PARTY_NOTICES.md` (regenerated by every build) covers what
   the extension bundles:
@@ -198,22 +198,22 @@ remote machines (WSL, SSH, containers, Codespaces; `extensionKind: workspace`). 
 2. Build and package from the tagged commit:
    ```bash
    npm ci && npm run build
-   cd extension && npm ci && npm run package    # dist-extension/codemap-<version>.vsix (add --pre-release to the vsce command for an odd minor)
+   cd extension && npm ci && npm run package    # dist-extension/seammap-<version>.vsix (add --pre-release to the vsce command for an odd minor)
    npx vsce ls --tree                           # out/, the runtime node_modules, README, CHANGELOG, notices; nothing else
    ```
 3. Check it the way a user gets it, in a clean profile:
-   `code --user-data-dir /tmp/cm-check --extensions-dir /tmp/cm-ext --install-extension dist-extension/codemap-<version>.vsix`,
-   then open a Laravel/Next.js folder in that profile and run **CodeMap: Open Map**.
+   `code --user-data-dir /tmp/cm-check --extensions-dir /tmp/cm-ext --install-extension dist-extension/seammap-<version>.vsix`,
+   then open a Laravel/Next.js folder in that profile and run **SeamMap: Open Map**.
 
 ### Publish
 
 Publish the same `.vsix` file to both registries (after the npm release, from the same tag):
 
 * **VS Code Marketplace** (publisher from section 4, signed in with Microsoft Entra ID):
-  `npx vsce publish --packagePath dist-extension/codemap-<version>.vsix --azure-credential`
+  `npx vsce publish --packagePath dist-extension/seammap-<version>.vsix --azure-credential`
   (pre-release: package with `--pre-release`; `vsce publish --packagePath` takes the mark from the file).
 * **Open VSX** (Cursor, Windsurf, VSCodium, Gitpod...; namespace and token from section 4):
-  `npx ovsx publish dist-extension/codemap-<version>.vsix -p <token>`.
+  `npx ovsx publish dist-extension/seammap-<version>.vsix -p <token>`.
 * Then check the listing: the README renders, the version is right, and installing from the Extensions view
   works.
 
@@ -224,7 +224,7 @@ removed endpoints, callers that disappeared, weaker protection states, new findi
 
 * It checks both files with `checkSchema()` and refuses another format version.
 * It warns when `meta.version` differs between the two files: results may differ between versions without any
-  code change, so a difference may come from the tool. CI should pin the version (`npx codemap@x.y.z`).
+  code change, so a difference may come from the tool. CI should pin the version (`npx seammap@x.y.z`).
 * It ignores the per-run fields and compares structured fields (IDs, kinds, states, counts), never wording.
 * It keeps the meaning of exit codes `0` and `1` and adds its own (for example "differences found"), which then
   become part of the command-line surface. `--json-only` output stays stable and scriptable.

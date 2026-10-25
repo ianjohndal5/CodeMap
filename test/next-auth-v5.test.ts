@@ -8,7 +8,7 @@ import { defaultConfig } from '../src/config.js';
 // A src/ layout app with NextAuth v5 (Auth.js), the patterns found on a real project (rentalsph):
 // `auth` re-exported from @/lib/auth, wrapped calls, IIFEs, `{ error }` guard results, and two
 // proxy files, of which Next.js reads only src/proxy.ts.
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'codemap-authjs-'));
+const root = fs.mkdtempSync(path.join(os.tmpdir(), 'seammap-authjs-'));
 afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
 
 const files: Record<string, string> = {
@@ -59,7 +59,7 @@ export async function GET() {
   'src/app/admin/export/route.ts': `export async function GET() {
   return new Response('id\\n1\\n')
 }`,
-  // Not read by Next.js (the app lives in src/): if CodeMap used it, /admin/export would look gated.
+  // Not read by Next.js (the app lives in src/): if SeamMap used it, /admin/export would look gated.
   'proxy.ts': `import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 export async function proxy(request: NextRequest) {
