@@ -12,6 +12,8 @@ with **Breaking:**.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-25
+
 First public release.
 
 ### Added
@@ -42,8 +44,8 @@ First public release.
   endpoints unknown, the summary, the Security tab and the "Start with" suggestion lead with them and a
   ready-to-edit snippet, with an exact count (`security.classifyFirst` in `graph.json`). States never change
   until you classify them.
-- **First view of large maps:** fitted to the width of the lanes with readable group titles, and the suggested
-  start scrolled into view and haloed, instead of the whole map at a few percent zoom.
+- **First view of large maps:** fitted to the width of the lanes with readable group titles, with the suggested
+  start scrolled into view and haloed.
 - **VS Code extension** (`extension/`): **Open Map** analyzes the workspace in a background process with progress
   and cancel and shows the map in an editor tab; cards open their file at the right line beside it; the active
   editor's file is highlighted, and **Show Current File on Map** selects it; the status bar says when the map is
@@ -56,15 +58,5 @@ First public release.
   the analysis with a message instead of skipping the rest of the project.
 - `analyze()` takes an `onStage` callback for progress.
 
-### Fixed
-
-- Lane headers no longer clip their titles ("ENDPOIN") when lanes are narrow.
-- Long middleware class names in the Security tab wrap instead of widening the panel.
-
-### Results may differ
-
-- The config lookup no longer depends on the current directory: the same command run from another folder now
-  uses the config next to the projects, so states and links can differ from development builds that read
-  `./seammap.config.json` only.
-- Every `graph.json` gains `schemaVersion` as its first key, with or without `--security`, so files written by
-  development builds differ from this release's even for the same code. The viewer asks to regenerate them.
+[Unreleased]: https://github.com/ianjohndal5/CodeMap/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/ianjohndal5/CodeMap/releases/tag/v1.0.0
