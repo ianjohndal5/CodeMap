@@ -1,0 +1,188 @@
+# Clean installs of the packed npm package on every supported platform, and the same graph.json everywhere.
+# Platform-specific install failures (native binaries) are the main distribution risk and cannot be tested
+# on one machine, hence the matrix. Nothing here publishes anything.
+name: install-matrix
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # .npmrc (legacy-peer-deps) applies here: the grammar packages are dev dependencies whose peer
+      # ranges conflict. Consumers of the packed package never see them (they are vendored).
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm pack --pack-destination dist-pack
+      - name: Reference graphs (fixtures, analyzed from the repo build)
+        run: |
+          mkdir -p ref
+          node dist/cli.js --backend fixtures/laravel-api --frontend fixtures/next-web --json-only --out ref/plain
+          node dist/cli.js --backend fixtures/laravel-security --frontend fixtures/next-security --security --json-only --out ref/security
+          node scripts/ci/normalize-graph.mjs ref/plain/graph.json ref/plain.json
+          node scripts/ci/normalize-graph.mjs ref/security/graph.json ref/security.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: dist-pack/*.tgz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: graph-reference
+          path: ref/*.json
+
+  # The repository's own tests on every OS (path separators, line endings, Windows paths).
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm test
+
+  install:
+    needs: pack
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, node: 20, pm: npm }
+          - { os: ubuntu-24.04, node: 24, pm: npm }
+          - { os: ubuntu-24.04, node: 24, pm: pnpm }
+          # Older libstdc++ (GCC 12): the case upstream's Linux core binding fails on.
+          - { os: ubuntu-22.04, node: 20, pm: npm }
+          - { os: ubuntu-24.04-arm, node: 20, pm: npm }
+          - { os: ubuntu-24.04-arm, node: 24, pm: pnpm }
+          - { os: macos-latest, node: 20, pm: npm }
+          - { os: macos-latest, node: 24, pm: pnpm }
+          - { os: macos-13, node: 22, pm: npm }
+          - { os: windows-latest, node: 20, pm: npm }
+          - { os: windows-latest, node: 24, pm: npm }
+          - { os: windows-latest, node: 24, pm: pnpm }
+          - { os: windows-11-arm, node: 22, pm: npm }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4 # for the fixtures and the normalizer only
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: package
+          path: pkg
+      - name: Install into a clean project outside the checkout
+        run: |
+          tgz="$(ls "$GITHUB_WORKSPACE"/pkg/*.tgz)"
+          mkdir -p "$RUNNER_TEMP/consumer" && cd "$RUNNER_TEMP/consumer"
+          echo '{"name":"consumer","version":"1.0.0","private":true}' > package.json
+          if [ "${{ matrix.pm }}" = pnpm ]; then
+            npm install -g pnpm@10 > /dev/null
+            pnpm add "$tgz" 2>&1 | tee install.log
+          else
+            npm install --no-audit --no-fund "$tgz" 2>&1 | tee install.log
+          fi
+          # No peer-dependency warnings, no blocked or failed build scripts, nothing compiled.
+          if grep -iE "ERESOLVE|peer dep|unmet peer|ignored build|node-gyp|gyp ERR" install.log; then exit 1; fi
+      - name: Analyze the fixtures with the installed command
+        run: |
+          cd "$RUNNER_TEMP/consumer"
+          npx codemap --version
+          npx codemap --backend "$GITHUB_WORKSPACE/fixtures/laravel-api" --frontend "$GITHUB_WORKSPACE/fixtures/next-web" --json-only --out out/plain
+          npx codemap --backend "$GITHUB_WORKSPACE/fixtures/laravel-security" --frontend "$GITHUB_WORKSPACE/fixtures/next-security" --security --json-only --out out/security
+          mkdir -p "$GITHUB_WORKSPACE/graphs"
+          node "$GITHUB_WORKSPACE/scripts/ci/normalize-graph.mjs" out/plain/graph.json "$GITHUB_WORKSPACE/graphs/plain.json"
+          node "$GITHUB_WORKSPACE/scripts/ci/normalize-graph.mjs" out/security/graph.json "$GITHUB_WORKSPACE/graphs/security.json"
+      - name: Global install
+        if: matrix.pm == 'npm'
+        run: |
+          npm install -g "$(ls "$GITHUB_WORKSPACE"/pkg/*.tgz)"
+          codemap --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: graphs-${{ matrix.os }}-node${{ matrix.node }}-${{ matrix.pm }}
+          path: graphs/*.json
+
+  # Linux distributions in containers: Debian 12 (old libstdc++) and Alpine (musl).
+  containers:
+    needs: pack
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [node:20-bookworm-slim, node:22-alpine]
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: package
+          path: pkg
+      - run: |
+          mkdir -p /tmp/consumer && cd /tmp/consumer
+          echo '{"name":"consumer","version":"1.0.0","private":true}' > package.json
+          npm install --no-audit --no-fund "$(ls "$GITHUB_WORKSPACE"/pkg/*.tgz)"
+          npx codemap --backend "$GITHUB_WORKSPACE/fixtures/laravel-api" --frontend "$GITHUB_WORKSPACE/fixtures/next-web" --json-only --out out
+          mkdir -p "$GITHUB_WORKSPACE/graphs"
+          node "$GITHUB_WORKSPACE/scripts/ci/normalize-graph.mjs" out/graph.json "$GITHUB_WORKSPACE/graphs/plain.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: graphs-container-${{ strategy.job-index }}
+          path: graphs/*.json
+
+  # The installed tool makes no network requests: run it with networking disabled.
+  offline:
+    needs: pack
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: package
+          path: pkg
+      - run: |
+          mkdir -p "$RUNNER_TEMP/consumer" && cd "$RUNNER_TEMP/consumer"
+          echo '{"name":"consumer","version":"1.0.0","private":true}' > package.json
+          npm install --no-audit --no-fund "$(ls "$GITHUB_WORKSPACE"/pkg/*.tgz)"
+          # A new network namespace has only a loopback device: any outbound connection fails.
+          sudo unshare --net -- sudo -u "$USER" env PATH="$PATH" bash -c "cd '$RUNNER_TEMP/consumer' && ip link set lo up 2>/dev/null; npx --offline codemap --backend '$GITHUB_WORKSPACE/fixtures/laravel-security' --frontend '$GITHUB_WORKSPACE/fixtures/next-security' --security --json-only --out out"
+          test -s out/graph.json
+
+  compare:
+    needs: [install, containers]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Every platform produced the reference graph.json
+        run: |
+          status=0
+          for dir in artifacts/graphs-*; do
+            for f in "$dir"/*.json; do
+              ref="artifacts/graph-reference/$(basename "$f")"
+              if cmp -s "$f" "$ref"; then echo "same      $dir/$(basename "$f")"; else echo "DIFFERENT $dir/$(basename "$f")"; diff <(head -c 2000000 "$ref") <(head -c 2000000 "$f") | head -40; status=1; fi
+            done
+          done
+          exit $status

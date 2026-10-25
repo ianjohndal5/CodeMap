@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Semgrep OSS",
+          "semanticVersion": "1.182.1",
+          "rules": [
+            {
+              "id": "php.laravel.security.laravel-sql-injection.laravel-sql-injection",
+              "name": "php.laravel.security.laravel-sql-injection.laravel-sql-injection",
+              "shortDescription": { "text": "Untrusted input might be used to build a database query" },
+              "defaultConfiguration": { "level": "error" },
+              "properties": { "security-severity": "8.1", "tags": ["CWE-89: SQL Injection"] }
+            },
+            {
+              "id": "php.lang.security.weak-crypto.weak-crypto",
+              "name": "php.lang.security.weak-crypto.weak-crypto",
+              "shortDescription": { "text": "Detected usage of weak crypto function" },
+              "defaultConfiguration": { "level": "warning" }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "php.laravel.security.laravel-sql-injection.laravel-sql-injection",
+          "message": { "text": "Detected a SQL query built from request input." },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "fixtures/laravel-security/app/Http/Controllers/BillingController.php", "uriBaseId": "%SRCROOT%" },
+                "region": { "startLine": 44, "startColumn": 16, "endLine": 44, "endColumn": 96 }
+              }
+            }
+          ]
+        },
+        {
+          "ruleIndex": 1,
+          "message": { "text": "md5() is a weak hash" },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "vendor/laravel/framework/src/Illuminate/Support/helpers.php" },
+                "region": { "startLine": 120 }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "php.lang.security.weak-crypto.weak-crypto",
+          "message": { "text": "md5() is a weak hash" },
+          "suppressions": [{ "kind": "inSource", "status": "accepted" }],
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "fixtures/laravel-security/app/Http/Controllers/AccountController.php" },
+                "region": { "startLine": 13 }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "php.lang.security.weak-crypto.weak-crypto",
+          "kind": "pass",
+          "message": { "text": "passing results are not findings" }
+        }
+      ]
+    },
+    {
+      "tool": {
+        "driver": {
+          "name": "ESLint",
+          "rules": [
+            {
+              "id": "react/no-danger",
+              "shortDescription": { "text": "Disallow usage of dangerous JSX properties" },
+              "messageStrings": { "dangerousProp": { "text": "Dangerous property '{0}' found" } }
+            }
+          ]
+        }
+      },
+      "originalUriBaseIds": { "PROJECTROOT": { "uri": "fixtures/next-security/" } },
+      "artifacts": [{ "location": { "uri": "src/components/InvoiceNote.tsx", "uriBaseId": "PROJECTROOT" } }],
+      "results": [
+        {
+          "ruleId": "react/no-danger",
+          "level": "warning",
+          "message": { "id": "dangerousProp", "arguments": ["dangerouslySetInnerHTML"] },
+          "locations": [{ "physicalLocation": { "artifactLocation": { "index": 0 }, "region": { "startLine": 11, "startColumn": 12 } } }]
+        },
+        {
+          "ruleId": "react/no-danger",
+          "level": "note",
+          "message": { "text": "A result without a location" }
+        }
+      ]
+    }
+  ]
+}

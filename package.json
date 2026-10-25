@@ -1,0 +1,72 @@
+{
+  "name": "codemap",
+  "displayName": "CodeMap",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Offline map of a Laravel backend and a Next.js frontend: which component calls which endpoint, and which code handles it. With an opt-in security lens.",
+  "keywords": [
+    "laravel",
+    "nextjs",
+    "next.js",
+    "visualizer",
+    "architecture",
+    "call-graph",
+    "static-analysis",
+    "tree-sitter",
+    "security-review"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "codemap": "dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "dist/**/*.scm",
+    "dist/native/**",
+    "viewer/*.html",
+    "viewer/*.js",
+    "viewer/*.css"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs && node scripts/vendor-native.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "prepack": "npm run build",
+    "codemap": "node dist/cli.js"
+  },
+  "dependencies": {
+    "@fontsource/ibm-plex-mono": "5.3.0",
+    "@fontsource/ibm-plex-sans": "5.3.0",
+    "@fontsource/space-grotesk": "5.3.0",
+    "commander": "14.0.3",
+    "cytoscape": "3.33.1",
+    "cytoscape-elk": "2.3.0",
+    "elkjs": "0.9.3",
+    "fast-glob": "3.3.3",
+    "ignore": "7.0.5",
+    "node-gyp-build": "4.8.4"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "tree-sitter": "0.25.1",
+    "tree-sitter-javascript": "0.25.0",
+    "tree-sitter-php": "0.24.2",
+    "tree-sitter-typescript": "0.23.2",
+    "typescript": "6.0.3",
+    "vitest": "4.1.12"
+  }
+}

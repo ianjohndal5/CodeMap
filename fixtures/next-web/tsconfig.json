@@ -1,0 +1,12 @@
+{
+  // JSONC on purpose: comments and trailing commas must be accepted.
+  "compilerOptions": {
+    "target": "ES2017",
+    "jsx": "preserve",
+    "strict": true,
+    "paths": {
+      "@/*": ["./src/*"], /* the near-universal Next.js alias */
+    },
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
+}

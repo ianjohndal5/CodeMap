@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CodeMap</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='1' y='3' width='4' height='10' rx='1.5' fill='%23ff5d4a'/%3E%3Crect x='6' y='5.5' width='4' height='5' rx='1.5' fill='%23f2b54a'/%3E%3Crect x='11' y='3' width='4' height='10' rx='1.5' fill='%237aa7ff'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="1.5" y="4" width="6" height="16" rx="2" fill="var(--laravel)"/>
+        <rect x="9" y="8.5" width="6" height="7" rx="2" fill="var(--endpoint)"/>
+        <rect x="16.5" y="4" width="6" height="16" rx="2" fill="var(--next)"/>
+      </svg>
+      <div class="brand-text">
+        <span class="brand-name">CodeMap</span>
+        <span class="brand-sub" id="project-chip"></span>
+      </div>
+    </div>
+
+    <div class="search" role="search">
+      <i data-icon="search" class="search-ico"></i>
+      <input id="search" type="search" placeholder="Search files, symbols or a URL like /api/users/42" autocomplete="off" spellcheck="false" aria-label="Search">
+      <kbd class="search-kbd">/</kbd>
+      <div id="search-results" class="search-results" hidden></div>
+    </div>
+
+    <div class="controls">
+      <div class="seg" data-seg="depth" role="group" aria-label="Focus depth">
+        <span class="seg-label">Focus</span>
+        <button data-value="auto" aria-pressed="true" title="Endpoints: whole chain · others: 1 hop">Auto</button>
+        <button data-value="1" aria-pressed="false" title="Direct neighbours">1</button>
+        <button data-value="2" aria-pressed="false" title="Two hops">2</button>
+        <button data-value="chain" aria-pressed="false" title="Callers and callees, transitively">Chain</button>
+      </div>
+      <div class="seg" data-seg="layout" role="group" aria-label="Layout">
+        <span class="seg-label">Layout</span>
+        <button data-value="auto" aria-pressed="true" title="Flow for small graphs, grouped for large ones">Auto</button>
+        <button data-value="flow" aria-pressed="false" title="ELK layered on every card">Flow</button>
+        <button data-value="grouped" aria-pressed="false" title="Cards packed into role groups">Grouped</button>
+      </div>
+      <button id="btn-isolate" class="btn toggle" aria-pressed="false" title="Show only the focused chain (I)"><i data-icon="target"></i><span>Isolate</span></button>
+      <button id="btn-sec" class="btn toggle" aria-pressed="false" title="Security lens: outline endpoints by protection state (S)" hidden><i data-icon="shield"></i><span>Lens</span></button>
+      <span class="sep"></span>
+      <button class="icon-btn" id="btn-collapse" title="Collapse all files"><i data-icon="collapse"></i></button>
+      <button class="icon-btn" id="btn-relayout" title="Run the layout again"><i data-icon="relayout"></i></button>
+      <button class="icon-btn" id="btn-theme" title="Light / dark (T)"><i data-icon="sun"></i></button>
+      <button class="icon-btn" id="btn-help" title="Shortcuts (?)"><i data-icon="help"></i></button>
+      <button class="icon-btn" id="btn-panel" title="Show / hide panel"><i data-icon="sidebar"></i></button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section class="stage" id="stage">
+      <div id="cy"></div>
+      <div class="lane-heads" id="lane-heads"></div>
+      <div class="legend-bar" id="legend-bar" role="group" aria-label="Edge kinds"></div>
+      <div class="nav-dock">
+        <div class="zoom-bar">
+          <button class="icon-btn" id="zoom-out" title="Zoom out (−)"><i data-icon="minus"></i></button>
+          <button class="zoom-level" id="zoom-level" title="Reset to 100%">100%</button>
+          <button class="icon-btn" id="zoom-in" title="Zoom in (+)"><i data-icon="plus"></i></button>
+          <span class="sep"></span>
+          <button class="icon-btn" id="zoom-fit" title="Fit to screen (F)"><i data-icon="fit"></i></button>
+          <button class="icon-btn" id="map-toggle" title="Show / hide minimap" aria-pressed="true"><i data-icon="map"></i></button>
+        </div>
+        <div class="minimap" id="minimap"><canvas></canvas></div>
+      </div>
+      <div class="loading" id="loading" hidden><span class="spinner"></span><span id="loading-text">Laying out…</span></div>
+      <div class="tooltip" id="tooltip" hidden></div>
+      <div class="toasts" id="toasts"></div>
+    </section>
+
+    <aside class="panel" id="panel">
+      <nav class="tabs" role="tablist">
+        <button role="tab" data-tab="inspect" aria-selected="true"><i data-icon="target"></i>Inspect</button>
+        <button role="tab" data-tab="insights" aria-selected="false"><i data-icon="sparkle"></i>Insights<span class="tab-badge" id="insights-badge" hidden></span></button>
+        <button role="tab" data-tab="security" aria-selected="false" hidden><i data-icon="shield"></i>Security<span class="tab-badge muted" id="security-badge" hidden></span></button>
+        <button role="tab" data-tab="filters" aria-selected="false"><i data-icon="layout"></i>Filters<span class="tab-badge muted" id="filters-badge" hidden></span></button>
+      </nav>
+      <div class="panel-body" id="panel-body"></div>
+    </aside>
+  </main>
+
+  <footer class="statusbar"><span id="status-left">Loading graph…</span><span id="status-right"></span></footer>
+
+  <dialog id="help-dialog" class="dialog">
+    <div class="dialog-head"><h2>Shortcuts</h2><button class="icon-btn" data-close-dialog title="Close"><i data-icon="close"></i></button></div>
+    <div class="shortcut-grid">
+      <div><span class="keys"><kbd>Click</kbd></span><span>Focus a node: neighbours, or the whole chain for endpoints</span></div>
+      <div><span class="keys"><kbd>Double-click</kbd></span><span>Open a file into classes and methods (again to close)</span></div>
+      <div><span class="keys"><kbd>Right-click</kbd></span><span>Open the node in VS Code</span></div>
+      <div><span class="keys"><kbd>Drag</kbd></span><span>Pan · scroll to zoom</span></div>
+      <div><span class="keys"><kbd>/</kbd></span><span>Search names, paths or a concrete URL</span></div>
+      <div><span class="keys"><kbd>I</kbd></span><span>Isolate the focused chain</span></div>
+      <div><span class="keys"><kbd>Esc</kbd></span><span>Clear focus, leave isolation</span></div>
+      <div><span class="keys"><kbd>F</kbd></span><span>Fit to screen</span></div>
+      <div><span class="keys"><kbd>+</kbd> <kbd>−</kbd></span><span>Zoom in / out</span></div>
+      <div><span class="keys"><kbd>E</kbd></span><span>Expand / collapse the selected file</span></div>
+      <div><span class="keys"><kbd>O</kbd></span><span>Open the selection in VS Code</span></div>
+      <div><span class="keys"><kbd>T</kbd></span><span>Light / dark theme</span></div>
+      <div><span class="keys"><kbd>P</kbd></span><span>Show / hide the panel</span></div>
+      <div id="help-sec" hidden><span class="keys"><kbd>S</kbd></span><span>Security lens on / off (graphs built with --security)</span></div>
+    </div>
+  </dialog>
+
+  <script src="vendor/cytoscape.min.js"></script>
+  <script src="vendor/elk.bundled.js"></script>
+  <script src="vendor/cytoscape-elk.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+# Same bytes on every OS: fixtures and expected outputs are compared across Linux, macOS and Windows.
+* text=auto eol=lf
+*.node binary
+*.wasm binary
+*.png binary
+*.woff2 binary

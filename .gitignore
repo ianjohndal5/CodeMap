@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.codemap/
+legacy/
+homes/
+rentalsph/
