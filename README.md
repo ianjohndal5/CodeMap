@@ -49,7 +49,7 @@ npm run build        # TypeScript to dist/, query files, and the prebuilt parser
 node dist/cli.js --backend fixtures/laravel-api --frontend fixtures/next-web
 ```
 
-`npm run build` copies the parsers' prebuilt binaries from the dev-only Tree-sitter packages into `dist/native` (`scripts/vendor-native.mjs`): the published package ships those binaries and depends on none of the Tree-sitter packages, which is what keeps installs clean. The core binding's Linux binaries are rebuilt in `native-prebuilds/` (`scripts/build-linux-binding.sh`), because upstream's need GCC 13's libstdc++ and fail on Debian 12 and Ubuntu 22.04. `npm link` gives a global `codemap` command from the clone.
+`npm run build` copies the parsers' prebuilt binaries from the dev-only Tree-sitter packages into `dist/native` (`scripts/vendor-native.mjs`): the published package ships those binaries and depends on none of the Tree-sitter packages, which is what keeps installs clean. A few upstream binaries are replaced by the rebuilds in `native-prebuilds/`: the core binding on every platform (upstream's crash in Node 20, and on Linux need GCC 13's libstdc++) and the TypeScript grammar on Linux arm64 (upstream's is an x86-64 binary). `native-prebuilds/README.md` explains, and the native-prebuilds workflow rebuilds them. `npm link` gives a global `codemap` command from the clone.
 
 Parsing stack: `tree-sitter@0.25.1`, `tree-sitter-php@0.24.2` (its `php` export, which accepts the `<?php` tag and inline HTML; `php_only` is for tag-less PHP), `tree-sitter-typescript@0.23.2` (`typescript` for `.ts`, `tsx` for `.tsx`/`.jsx`) and `tree-sitter-javascript@0.25.0` (`.js`/`.mjs`/`.cjs`).
 

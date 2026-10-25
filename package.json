@@ -45,7 +45,7 @@
     "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs && node scripts/vendor-native.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "prepack": "npm run build",
+    "prepack": "npm run build && node scripts/vendor-native.mjs --check",
     "codemap": "node dist/cli.js"
   },
   "dependencies": {

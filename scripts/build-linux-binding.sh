@@ -1,47 +1,48 @@
 #!/usr/bin/env bash
-# Rebuild the Tree-sitter core binding for Linux (x64 and arm64) into native-prebuilds/tree-sitter.
+# Build the Linux binaries in native-prebuilds/ (native-prebuilds/README.md says why they replace upstream's):
+#   tree-sitter (the core binding), Node-API 8: linux-x64 (glibc and musl) and linux-arm64
+#   tree-sitter-typescript: linux-arm64
 #
-# Why: the upstream prebuilds of tree-sitter 0.25.1 for Linux are linked against GCC 13's libstdc++
-# (GLIBCXX_3.4.31), so they fail to load on Debian 12, Ubuntu 22.04 and older. These are built in
-# Debian 11 with libstdc++ linked statically: they need glibc 2.17 or newer and nothing else, the same
-# baseline as the upstream grammar prebuilds. arm64 is cross-compiled with Debian's aarch64 toolchain.
-# A musl build for Alpine (linux-x64/tree-sitter.musl.node) is made in Alpine itself: node-gyp-build loads
-# it on musl and the glibc one elsewhere.
+# glibc builds are made in Debian 11 with libstdc++ linked statically: they need glibc 2.17 or newer and
+# nothing else, the same baseline as the upstream grammar prebuilds. arm64 is cross-compiled with Debian's
+# aarch64 toolchain. The musl build (linux-x64/tree-sitter.musl.node, which node-gyp-build loads on Alpine) is
+# made in Alpine. macOS and Windows binaries need those systems: .github/workflows/native-prebuilds.yml builds
+# them, and runs this script for Linux.
 #
-# Needs Docker and an `npm install` (node_modules/tree-sitter and node-addon-api are the sources).
-# Run it after upgrading tree-sitter; scripts/vendor-native.mjs refuses a version mismatch.
+# Needs Docker and `npm ci` (the packages in node_modules are the sources). OUT sets the output directory.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-version="$(node -p "require('$root/node_modules/tree-sitter/package.json').version")"
-out="$root/native-prebuilds/tree-sitter"
-mkdir -p "$out/linux-x64" "$out/linux-arm64"
+out="$(mkdir -p "${OUT:-$root/native-prebuilds}" && cd "${OUT:-$root/native-prebuilds}" && pwd)"
 
-build() { # <platform> <docker setup> <env> <node-gyp arch> <strip> [image] [output file]
+build() { # <package> <platform> <output file> <docker setup> <env> <node-gyp arch> <strip> [image]
+  mkdir -p "$out/$1/$2"
   docker run --rm \
-    -v "$root/node_modules/tree-sitter:/src/tree-sitter:ro" \
+    -v "$root/node_modules/$1:/src/pkg:ro" \
     -v "$root/node_modules/node-addon-api:/src/node-addon-api:ro" \
-    -v "$out/$1:/out" \
-    "${6:-node:20-bullseye}" sh -c "
+    -v "$out/$1/$2:/out" \
+    "${8:-node:20-bullseye}" sh -c "
       set -e
-      $2
+      $4
       mkdir -p /tmp/b/node_modules
-      cp -r /src/tree-sitter /tmp/b/ts
+      cp -r /src/pkg /tmp/b/pkg
       cp -r /src/node-addon-api /tmp/b/node_modules/node-addon-api
-      cd /tmp/b/ts
-      env $3 LDFLAGS='-static-libstdc++ -static-libgcc' npx --yes node-gyp@11 rebuild --arch=$4 --nodedir=/usr/local --napi_build_version=8 > /tmp/build.log 2>&1 || { tail -40 /tmp/build.log; exit 1; }
-      $5 --strip-unneeded build/Release/tree_sitter_runtime_binding.node
-      cp build/Release/tree_sitter_runtime_binding.node /out/${7:-tree-sitter.node}
-      chown $(id -u):$(id -g) /out/${7:-tree-sitter.node}
+      cd /tmp/b/pkg
+      env $5 LDFLAGS='-static-libstdc++ -static-libgcc' npx --yes node-gyp@11 rebuild --arch=$6 --nodedir=/usr/local --napi_build_version=8 > /tmp/build.log 2>&1 || { tail -40 /tmp/build.log; exit 1; }
+      $7 --strip-unneeded build/Release/*_binding.node
+      cp build/Release/*_binding.node /out/$3
+      chown $(id -u):$(id -g) /out/$3
     "
+  node -p "require('$root/node_modules/$1/package.json').version" > "$out/$1/VERSION"
 }
 
-build linux-x64 ':' '' x64 strip
-build linux-arm64 'apt-get update -qq > /dev/null && apt-get install -y -qq g++-aarch64-linux-gnu > /dev/null' \
-  'CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++ LINK=aarch64-linux-gnu-g++' arm64 aarch64-linux-gnu-strip
-build linux-x64 'apk add --no-cache -q python3 make g++ binutils' '' x64 strip node:20-alpine tree-sitter.musl.node
+arm64_setup='apt-get update -qq > /dev/null && apt-get install -y -qq g++-aarch64-linux-gnu > /dev/null'
+arm64_env='CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++ LINK=aarch64-linux-gnu-g++'
 
-echo "$version" > "$out/VERSION"
-(cd "$out" && sha256sum linux-*/tree-sitter*.node > SHA256SUMS)
-echo "built tree-sitter $version for linux-x64 (glibc, musl) and linux-arm64 (glibc) in native-prebuilds/tree-sitter"
+build tree-sitter linux-x64 tree-sitter.node ':' '' x64 strip
+build tree-sitter linux-arm64 tree-sitter.node "$arm64_setup" "$arm64_env" arm64 aarch64-linux-gnu-strip
+build tree-sitter linux-x64 tree-sitter.musl.node 'apk add --no-cache -q python3 make g++ binutils' '' x64 strip node:20-alpine
+build tree-sitter-typescript linux-arm64 tree-sitter-typescript.node "$arm64_setup" "$arm64_env" arm64 aarch64-linux-gnu-strip
+
+(cd "$out" && find . -name '*.node' | sed 's|^\./||' | LC_ALL=C sort | xargs sha256sum > SHA256SUMS)
 cat "$out/SHA256SUMS"

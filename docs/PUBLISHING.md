@@ -72,8 +72,9 @@ Bump with `npm version patch|minor|major` (it tags the commit).
 ## 6. Release (npm)
 
 1. `npm ci && npm run typecheck && npm test`.
-2. If `tree-sitter` was upgraded: `./scripts/build-linux-binding.sh` (Docker) and commit `native-prebuilds/`;
-   the build refuses to run with a version mismatch.
+2. If `tree-sitter` or `tree-sitter-typescript` was upgraded: run the **native-prebuilds** workflow, unpack its
+   artifact into `native-prebuilds/` and commit it (`native-prebuilds/README.md`). `npm pack` refuses to
+   package without them.
 3. Push and wait for the **install-matrix** workflow (`.github/workflows/install-matrix.yml`) to pass on every
    platform: clean installs with npm and pnpm, the fixtures analyzed with the installed command, the same
    `graph.json` everywhere, and an offline run.

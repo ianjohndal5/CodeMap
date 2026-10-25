@@ -72,11 +72,11 @@ jobs:
           - { os: ubuntu-24.04-arm, node: 24, pm: pnpm }
           - { os: macos-latest, node: 20, pm: npm }
           - { os: macos-latest, node: 24, pm: pnpm }
-          - { os: macos-15-intel, node: 22, pm: npm } # macOS on x64
+          - { os: macos-15-intel, node: 20, pm: npm } # macOS on x64
           - { os: windows-latest, node: 20, pm: npm }
           - { os: windows-latest, node: 24, pm: npm }
           - { os: windows-latest, node: 24, pm: pnpm }
-          - { os: windows-11-arm, node: 22, pm: npm }
+          - { os: windows-11-arm, node: 20, pm: npm }
     runs-on: ${{ matrix.os }}
     defaults:
       run:

@@ -1,0 +1,130 @@
+# Build the Tree-sitter binaries that replace upstream's prebuilds (native-prebuilds/README.md says why), on
+# real machines for every platform, and run the repository's tests with each of them on Node 20, the oldest
+# supported version. The result is one artifact, `native-prebuilds`: unpack it into native-prebuilds/ and
+# commit it. Run it after upgrading tree-sitter or tree-sitter-typescript. Nothing here publishes or commits.
+name: native-prebuilds
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/native-prebuilds.yml
+      - scripts/build-linux-binding.sh
+
+permissions:
+  contents: read
+
+jobs:
+  # The core binding for macOS and Windows, Node-API 8 (upstream's are Node-API 10 and crash in Node 20).
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-latest, platform: darwin-arm64 }
+          - { os: macos-15-intel, platform: darwin-x64 }
+          - { os: windows-latest, platform: win32-x64 }
+          - { os: windows-11-arm, platform: win32-arm64 }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-python@v5 # for node-gyp
+        with:
+          python-version: '3.12'
+      # Without install scripts: on Node 20, tree-sitter's would compile it, and the tests must load the new build.
+      - run: npm ci --ignore-scripts
+      - name: Build
+        run: |
+          b="$RUNNER_TEMP/build" && mkdir -p "$b/node_modules"
+          cp -r node_modules/tree-sitter "$b/pkg" && cp -r node_modules/node-addon-api "$b/node_modules/"
+          out="$GITHUB_WORKSPACE/out/tree-sitter" && mkdir -p "$out/${{ matrix.platform }}"
+          node -p "require('./node_modules/tree-sitter/package.json').version" > "$out/VERSION"
+          cd "$b/pkg"
+          npx --yes node-gyp@11 rebuild --napi_build_version=8
+          file="$out/${{ matrix.platform }}/tree-sitter.node"
+          cp build/Release/tree_sitter_runtime_binding.node "$file"
+          if [ "$RUNNER_OS" = macOS ]; then strip -x "$file" && codesign --force --sign - "$file"; fi
+      - name: Test it on Node 20
+        run: |
+          cp "out/tree-sitter/${{ matrix.platform }}/tree-sitter.node" "node_modules/tree-sitter/prebuilds/${{ matrix.platform }}/tree-sitter.node"
+          npm test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binding-${{ matrix.platform }}
+          path: out/
+
+  # Linux (glibc x64 and arm64, musl x64) in Docker, see scripts/build-linux-binding.sh.
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci --ignore-scripts
+      - run: OUT="$GITHUB_WORKSPACE/out" ./scripts/build-linux-binding.sh
+      - name: Test linux-x64 on Node 20
+        run: |
+          cp out/tree-sitter/linux-x64/tree-sitter.node node_modules/tree-sitter/prebuilds/linux-x64/tree-sitter.node
+          npm test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binding-linux
+          path: |
+            out/
+            !out/SHA256SUMS
+
+  # The cross-compiled arm64 builds, on arm64.
+  linux-arm64:
+    needs: linux
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@v4
+        with:
+          name: binding-linux
+          path: out
+      - name: Test linux-arm64 on Node 20
+        run: |
+          cp out/tree-sitter/linux-arm64/tree-sitter.node node_modules/tree-sitter/prebuilds/linux-arm64/tree-sitter.node
+          cp out/tree-sitter-typescript/linux-arm64/tree-sitter-typescript.node node_modules/tree-sitter-typescript/prebuilds/linux-arm64/tree-sitter-typescript.node
+          npm test
+
+  collect:
+    needs: [build, linux, linux-arm64]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: binding-*
+          path: fresh
+          merge-multiple: true
+      - name: Replace native-prebuilds/ with the new builds and check them
+        run: |
+          find native-prebuilds -mindepth 1 -maxdepth 1 -type d -exec rm -r {} +
+          cp -r fresh/. native-prebuilds/
+          cd native-prebuilds && find . -name '*.node' | sed 's|^\./||' | LC_ALL=C sort | xargs sha256sum > SHA256SUMS && cd ..
+          node scripts/vendor-native.mjs --check
+          cat native-prebuilds/SHA256SUMS
+          file native-prebuilds/*/*/*.node
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-prebuilds
+          path: |
+            native-prebuilds/
+            !native-prebuilds/README.md
