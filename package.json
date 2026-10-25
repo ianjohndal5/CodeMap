@@ -56,6 +56,7 @@
     "test": "vitest run",
     "prepack": "npm run build && node scripts/vendor-native.mjs --check",
     "preversion": "node scripts/check-release.mjs",
+    "version": "node scripts/extension-manifest.mjs && git add extension/package.json extension/package-lock.json",
     "prepublishOnly": "node scripts/check-release.mjs",
     "seammap": "node dist/cli.js"
   },

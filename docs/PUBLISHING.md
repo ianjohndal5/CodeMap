@@ -132,7 +132,8 @@ command on every platform.
    differ" and that breaking changes say **Breaking:**. Commit.
 5. **Bump.** `npm version x.y.z` (or `patch`, `minor`, `major`). It needs a clean working tree, refuses when
    `CHANGELOG.md` has no section for the new version (the `preversion` script), then sets the version in
-   `package.json` and `package-lock.json`, commits, and tags the commit `vx.y.z`.
+   `package.json` and `package-lock.json`, regenerates `extension/package.json` and `extension/package-lock.json`
+   with the same version (the `version` script), commits all four, and tags the commit `vx.y.z`.
 6. **Push the commit and the tag:** `git push --follow-tags`.
 7. `npm pack --dry-run` and read the file list: `dist/`, `dist/native/`, `viewer/`, `README.md`,
    `CHANGELOG.md`, `package.json` (and `LICENSE`), nothing else. About 5.8 MB packed.

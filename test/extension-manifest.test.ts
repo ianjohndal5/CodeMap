@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { extensionManifest } from '../scripts/extension-manifest.mjs';
+import { extensionLock, extensionManifest } from '../scripts/extension-manifest.mjs';
 
 const root = path.resolve(__dirname, '..');
 const read = (f: string) => JSON.parse(fs.readFileSync(path.join(root, f), 'utf8'));
@@ -10,6 +10,8 @@ describe('extension/package.json', () => {
   it('is generated from package.json (node scripts/extension-manifest.mjs)', () => {
     const current = read('extension/package.json');
     expect(current).toEqual(extensionManifest(read('package.json'), current));
+    const lock = read('extension/package-lock.json');
+    expect(lock).toEqual(extensionLock(lock, current));
   });
 
   it("derives every identifier from the CLI's command name", () => {

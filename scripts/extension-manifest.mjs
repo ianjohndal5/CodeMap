@@ -1,9 +1,10 @@
 // extension/package.json, generated from the root package.json: the extension's identifiers (name, commands,
 // settings keys, view type) derive from the CLI's command name, its version is the CLI's, and its runtime
 // dependencies are the analyzer's. Hand-edited fields (publisher, engines, dev dependencies, scripts) are kept.
-//   node scripts/extension-manifest.mjs           write extension/package.json
-//   node scripts/extension-manifest.mjs --check   exit 1 if it is out of date (a test runs this)
-// scripts/rename.mjs runs it after renaming, so a rename covers the extension too.
+//   node scripts/extension-manifest.mjs           write extension/package.json (and its lockfile's name and version)
+//   node scripts/extension-manifest.mjs --check   exit 1 if they are out of date (a test checks the same)
+// scripts/rename.mjs runs it after renaming, and `npm version` (the "version" script) before its commit, so a
+// rename or a version bump covers the extension too.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -68,19 +69,31 @@ export function extensionManifest(pkg, current = {}) {
   };
 }
 
+/** extension/package-lock.json with the manifest's name and version (npm writes both into its root entry). */
+export function extensionLock(lock, manifest) {
+  const root = lock.packages?.[''];
+  return { ...lock, name: manifest.name, version: manifest.version, ...(root ? { packages: { ...lock.packages, '': { ...root, name: manifest.name, version: manifest.version } } } : {}) };
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const file = path.join(root, 'extension', 'package.json');
+  const lockFile = path.join(root, 'extension', 'package-lock.json');
+  const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '');
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-  const current = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
-  const text = JSON.stringify(extensionManifest(pkg, current), null, 2) + '\n';
-  const before = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+  const current = fs.existsSync(file) ? JSON.parse(read(file)) : {};
+  const manifest = extensionManifest(pkg, current);
+  const outputs = [[file, JSON.stringify(manifest, null, 2) + '\n']];
+  if (fs.existsSync(lockFile)) outputs.push([lockFile, JSON.stringify(extensionLock(JSON.parse(read(lockFile)), manifest), null, 2) + '\n']);
+  const stale = outputs.filter(([f, text]) => read(f) !== text);
   if (process.argv.includes('--check')) {
-    if (text !== before) {
-      console.error('extension/package.json is out of date with package.json: run node scripts/extension-manifest.mjs');
+    if (stale.length) {
+      console.error(`${stale.map(([f]) => path.relative(root, f)).join(' and ')} out of date with package.json: run node scripts/extension-manifest.mjs`);
       process.exit(1);
     }
-  } else if (text !== before) {
-    fs.writeFileSync(file, text);
-    console.log('wrote extension/package.json');
+  } else {
+    for (const [f, text] of stale) {
+      fs.writeFileSync(f, text);
+      console.log(`wrote ${path.relative(root, f)}`);
+    }
   }
 }

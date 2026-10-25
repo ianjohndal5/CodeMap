@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { extensionManifest } from './extension-manifest.mjs';
+import { extensionLock, extensionManifest } from './extension-manifest.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = Object.fromEntries(
@@ -78,14 +78,10 @@ const extFile = path.join(root, 'extension', 'package.json');
 if (fs.existsSync(extFile)) {
   const current = JSON.parse(fs.readFileSync(extFile, 'utf8'));
   if (publisher) current.publisher = publisher;
-  fs.writeFileSync(extFile, JSON.stringify(extensionManifest(pkg, current), null, 2) + '\n');
+  const manifest = extensionManifest(pkg, current);
+  fs.writeFileSync(extFile, JSON.stringify(manifest, null, 2) + '\n');
   const extLock = path.join(root, 'extension', 'package-lock.json');
-  if (fs.existsSync(extLock)) {
-    const lock = JSON.parse(fs.readFileSync(extLock, 'utf8'));
-    lock.name = command;
-    if (lock.packages?.['']) lock.packages[''].name = command;
-    fs.writeFileSync(extLock, JSON.stringify(lock, null, 2) + '\n');
-  }
+  if (fs.existsSync(extLock)) fs.writeFileSync(extLock, JSON.stringify(extensionLock(JSON.parse(fs.readFileSync(extLock, 'utf8')), manifest), null, 2) + '\n');
   changed.push('extension/package.json', 'extension/package-lock.json');
 }
 console.log(`package.json: name ${npm}, command ${command}, display name ${display}${publisher ? `; extension publisher ${publisher}` : ''}`);

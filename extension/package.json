@@ -2,7 +2,7 @@
   "name": "seammap",
   "displayName": "SeamMap",
   "description": "Offline map of a Laravel backend and a Next.js frontend: which component calls which endpoint, and which code handles it. With an opt-in security lens.. Maps Laravel and Next.js code, the endpoints between them and an optional security lens, inside the editor; fully offline.",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "publisher": "ianjohndal5",
   "license": "MIT",
   "repository": {
